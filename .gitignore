@@ -17,6 +17,7 @@ run.sh
 
 # Claude Code local settings
 .claude/
+.playwright-mcp/
 
 # OS files
 .DS_Store
