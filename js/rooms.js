@@ -1034,30 +1034,43 @@ var KRKAI_Rooms = (function() {
 
     function loadPhoto(num) {
       active++;
-      var jpgSrc = config.path + num + '.jpg' + bust;
+      var webpSrc = config.path + num + '.webp' + bust;
+      var jpgSrc  = config.path + num + '.jpg'  + bust;
+      var pngSrc  = config.path + num + '.png'  + bust;
       var img = new Image();
       img.onload = function() {
-        found.push({ num: num, src: jpgSrc });
+        found.push({ num: num, src: webpSrc });
         if (onProgress) onProgress(found.length);
         active--;
         processQueue();
       };
       img.onerror = function() {
-        var pngSrc = config.path + num + '.png' + bust;
-        var img2 = new Image();
-        img2.onload = function() {
-          found.push({ num: num, src: pngSrc });
+        // WebP not found — fall back to JPG
+        var img1 = new Image();
+        img1.onload = function() {
+          found.push({ num: num, src: jpgSrc });
           if (onProgress) onProgress(found.length);
           active--;
           processQueue();
         };
-        img2.onerror = function() {
-          active--;
-          processQueue();
+        img1.onerror = function() {
+          // JPG not found — fall back to PNG
+          var img2 = new Image();
+          img2.onload = function() {
+            found.push({ num: num, src: pngSrc });
+            if (onProgress) onProgress(found.length);
+            active--;
+            processQueue();
+          };
+          img2.onerror = function() {
+            active--;
+            processQueue();
+          };
+          img2.src = pngSrc;
         };
-        img2.src = pngSrc;
+        img1.src = jpgSrc;
       };
-      img.src = jpgSrc;
+      img.src = webpSrc;
     }
 
     processQueue();

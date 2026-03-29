@@ -11,6 +11,10 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
+  <!-- Preload critical assets -->
+  <link rel="preload" as="image" href="images/3.webp" type="image/webp" crossorigin="anonymous">
+  <link rel="preload" as="image" href="images/logo.png">
+
   <!-- Prevent browser scroll restoration so page always loads at top -->
   <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; }</script>
 
@@ -64,7 +68,7 @@
   <nav id="navbar">
     <div class="nav-inner">
       <a href="#" class="nav-logo">
-        <img src="images/logo.png" alt="KRKAI Logo" id="krkai-logo">
+        <img src="images/logo.png" alt="KRKAI Logo" id="krkai-logo" loading="lazy">
         <span class="logo-text">KRKAI</span>
       </a>
       <button id="hamburger" aria-label="Menu">
@@ -581,7 +585,7 @@
       <footer id="section-footer">
         <div class="section-inner footer-inner">
           <div class="footer-logo">
-            <img src="images/logo.png" alt="KRKAI" class="footer-logo-img">
+            <img src="images/logo.png" alt="KRKAI" class="footer-logo-img" loading="lazy">
           </div>
           <p class="footer-tagline" data-key="footer_tagline">Free for Every Child Who Deserves Better.</p>
           <div class="footer-links">
@@ -710,17 +714,17 @@
   <script src="js/magical-overlays.js?v=1"></script>
   <script src="js/scene.js?v=14"></script>
   <script src="js/pen.js?v=19"></script>
-  <script src="js/iniibo.js?v=6"></script>
+  <script src="js/iniibo.js?v=6" defer></script>
   <!-- God-ray light shaft (toggled by scroll.js based on scroll progress) -->
   <script src="js/scroll.js?v=13"></script>
-  <script src="js/i18n.js?v=7"></script>
-  <script src="js/features.js?v=6"></script>
+  <script src="js/i18n.js?v=7" defer></script>
+  <script src="js/features.js?v=6" defer></script>
   <!-- gl-matrix for WebGL globe gallery (local copy) -->
   <script src="js/gl-matrix-min.js"></script>
-  <script src="js/gallery.js?v=12"></script>
-  <script src="js/rooms.js?v=12"></script>
-  <script src="js/cursor.js?v=6"></script>
-  <script src="js/app.js?v=6"></script>
+  <script src="js/gallery.js?v=12" defer></script>
+  <script src="js/rooms.js?v=12" defer></script>
+  <script src="js/cursor.js?v=6" defer></script>
+  <script src="js/app.js?v=6" defer></script>
 
 </body>
 </html>

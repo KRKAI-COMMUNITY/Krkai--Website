@@ -36,8 +36,9 @@ var KRKAI_Scene = (function() {
   // === AUTO-PERFORMANCE DETECTION ===
   var fpsFrameCount = 0;
   var fpsAccumulator = 0;
-  var perfBloomDisabled = false;
-  var perfFxaaDisabled = false;
+  var _isMobileDevice = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+  var perfBloomDisabled = _isMobileDevice; // always off on mobile
+  var perfFxaaDisabled  = _isMobileDevice; // always off on mobile
 
   // Reusable temp vector (avoid per-frame allocations)
   var _scTmpV = new THREE.Vector3();
@@ -405,8 +406,8 @@ var KRKAI_Scene = (function() {
       bloomPass.enabled = false;  // disabled until strength > 0 (saves a full render pass)
       composer.addPass(bloomPass);
 
-      // === DEPTH OF FIELD (BokehPass) — cinematic shallow DOF ===
-      if (typeof THREE.BokehPass !== 'undefined' && typeof THREE.BokehShader !== 'undefined') {
+      // === DEPTH OF FIELD (BokehPass) — cinematic shallow DOF, skip on mobile ===
+      if (!_isMobileDevice && typeof THREE.BokehPass !== 'undefined' && typeof THREE.BokehShader !== 'undefined') {
         try {
           bokehPass = new THREE.BokehPass(scene, camera, {
             focus: 2.0,
@@ -964,8 +965,8 @@ var KRKAI_Scene = (function() {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -4
     });
-    // Load the actual 3.png image and apply it
-    loadImageTexture('images/3.png', function(tex) {
+    // Load the actual parchment image (WebP preferred, PNG fallback)
+    loadImageTexture('images/3.webp', function(tex) {
       tex.minFilter = THREE.LinearMipmapLinearFilter;
       tex.magFilter = THREE.LinearFilter;
       tex.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 8;
@@ -1682,11 +1683,11 @@ var KRKAI_Scene = (function() {
     var frameMat = new THREE.MeshStandardMaterial({ color: 0xD4AF37, roughness: 0.4, metalness: 0.4 });
 
     var posters = [
-      { src: 'images/poster1.png', w: 1.0, h: 1.4, canvasIdx: 0 },
-      { src: 'images/poster4.png', w: 1.2, h: 0.9, canvasIdx: 1 },
-      { src: 'images/poster5.png', w: 1.0, h: 1.0, canvasIdx: 2 },
-      { src: 'images/poster2.png', w: 0.9, h: 0.9, canvasIdx: 3 },
-      { src: 'images/poster3.png', w: 0.7, h: 0.7, canvasIdx: 4 }
+      { src: 'images/poster1.webp', w: 1.0, h: 1.4, canvasIdx: 0 },
+      { src: 'images/poster4.webp', w: 1.2, h: 0.9, canvasIdx: 1 },
+      { src: 'images/poster5.webp', w: 1.0, h: 1.0, canvasIdx: 2 },
+      { src: 'images/poster2.webp', w: 0.9, h: 0.9, canvasIdx: 3 },
+      { src: 'images/poster3.webp', w: 0.7, h: 0.7, canvasIdx: 4 }
     ];
 
     var placements = [

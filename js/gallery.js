@@ -601,23 +601,27 @@ void main() {
       .then(function(res) { return res.text(); })
       .then(function(html) {
         var re = /href="([^"?#]+\.(jpg|jpeg|png|webp|gif|avif))"/gi;
-        var found = [], seen = {}, m;
+        var byBase = {}, m;
         while ((m = re.exec(html)) !== null) {
-          var src = m[1].split('/').pop(); // always take just the filename
-          if (seen[src]) continue;
-          seen[src] = true;
-          var name = src.replace(/\.[^.]+$/, '').replace(/[-_]/g, ' ');
-          found.push({ src: 'gallery/' + src, name: name });
+          var src  = m[1].split('/').pop();
+          var base = src.replace(/\.[^.]+$/, '');
+          var ext  = src.split('.').pop().toLowerCase();
+          // prefer webp over jpg/png
+          if (!byBase[base] || ext === 'webp') byBase[base] = src;
         }
+        var found = Object.keys(byBase).map(function(base) {
+          var src = byBase[base];
+          return { src: 'gallery/' + src, name: base.replace(/[-_]/g, ' ') };
+        });
         return found.length ? found : fallbackImages();
       })
       .catch(function() { return fallbackImages(); });
   }
   function fallbackImages() {
     var list = [];
-    for (var i = 1; i <= 27; i++) list.push({ src:'gallery/chemba-'+i+'.jpg', name:'Chembarambakkam '+i });
-    for (var i = 1; i <= 63; i++) list.push({ src:'gallery/porur1-'+i+'.jpg', name:'Porur Session 1 — '+i });
-    for (var i = 1; i <= 11; i++) list.push({ src:'gallery/porur2-'+i+'.jpg', name:'Porur Session 2 — '+i });
+    for (var i = 1; i <= 27; i++) list.push({ src:'gallery/chemba-'+i+'.webp', name:'Chembarambakkam '+i });
+    for (var i = 1; i <= 63; i++) list.push({ src:'gallery/porur1-'+i+'.webp', name:'Porur Session 1 — '+i });
+    for (var i = 1; i <= 11; i++) list.push({ src:'gallery/porur2-'+i+'.webp', name:'Porur Session 2 — '+i });
     return list;
   }
 

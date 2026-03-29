@@ -128,6 +128,8 @@ var KRKAI_MagicalOverlays = (function() {
   function initPetals() {
     var pc = cfg.petals;
     if (!pc || pc.count <= 0) return;
+    // Reduce petal count on mobile to avoid DOM layout churn
+    if (window.innerWidth < 768) pc = Object.assign({}, pc, { count: 20 });
 
     var container = document.getElementById('petal-overlay');
     if (!container) return;

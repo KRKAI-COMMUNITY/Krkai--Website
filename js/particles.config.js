@@ -100,7 +100,7 @@ var KRKAI_ParticleConfig = {
 
   // ── CSS FALLING PETALS (purple & gold) ─────────────────
   petals: {
-    count: 150,         // total petals (0 = disabled)
+    count: 60,          // total petals (0 = disabled)
     purpleRatio: 5.0,  // fraction that are purple (rest are gold)
     sizeMin: 10,        // smallest petal size in px
     sizeMax: 15,       // largest petal size in px
