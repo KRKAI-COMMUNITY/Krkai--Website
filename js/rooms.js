@@ -8,13 +8,15 @@
 var KRKAI_Rooms = (function() {
   'use strict';
 
+  // Loaded from rooms-manifest.json at init — allows adding rooms without code changes.
+  // Fallback to hardcoded list if manifest fetch fails.
   var ROOM_CONFIG = [
-    { id: 'porur-1',         label: 'Porur 1',         path: 'images/rooms/porur-1/' },
-    { id: 'porur-2',         label: 'Porur 2',         path: 'images/rooms/porur-2/' },
-    { id: 'chembarambakkam', label: 'Chembarambakkam', path: 'images/rooms/Chembarambakkam/' }
+    { id: 'porur-1',         label: 'Porur 1',         path: 'images/rooms/porur-1/',         count: 63 },
+    { id: 'porur-2',         label: 'Porur 2',         path: 'images/rooms/porur-2/',         count: 11 },
+    { id: 'chembarambakkam', label: 'Chembarambakkam', path: 'images/rooms/Chembarambakkam/', count: 27 }
   ];
 
-  var MAX_PHOTOS  = 50;
+  var MAX_PHOTOS  = 100;  // safety cap for rooms without a count in manifest
   var FRAME_WIDTH = 1.2;
   var FRAME_HEIGHT= 0.9;
   var FRAME_GAP   = 0.4;
@@ -46,6 +48,7 @@ var KRKAI_Rooms = (function() {
   var textureCache     = {};  // url → THREE.Texture (kept alive across room closes)
   var roomPhotoCache   = {};  // roomId → photoUrls[] (skip rediscovery on reopen)
   var roomPreloadCache = {};  // roomId → { status: 'loading'|'done', photoUrls:[] }
+  var lqipCache        = {};  // roomId → { num → dataURL } (blur-up placeholders)
 
   // Default camera pose
   var DEFAULT_POS    = { x: 0, y: 1.6, z: 1.5 };
@@ -118,13 +121,35 @@ var KRKAI_Rooms = (function() {
   }
 
   // Minimal dark placeholder — shown only while real photo loads
-  function createRoomPhotoCanvas() {
+  // Creates a placeholder canvas: solid dark if no LQIP available,
+  // or a blurry mini-image when an LQIP base64 is provided.
+  function createRoomPhotoCanvas(lqipDataUrl) {
     var c = document.createElement('canvas');
     c.width = 400; c.height = 300;
     var ctx = c.getContext('2d');
     ctx.fillStyle = '#1A1410';
     ctx.fillRect(0, 0, 400, 300);
+    if (lqipDataUrl) {
+      var img = new Image();
+      img.onload = function() {
+        ctx.filter = 'blur(4px)';
+        ctx.drawImage(img, 0, 0, 400, 300);
+        ctx.filter = 'none';
+      };
+      img.src = lqipDataUrl;
+    }
     return c;
+  }
+
+  // Fetches lqip.json for a room and caches it. No-op if already cached or missing.
+  function fetchLqip(config) {
+    var roomId = config.id;
+    if (lqipCache[roomId]) return;  // already fetched
+    lqipCache[roomId] = {};         // mark as fetching (avoid duplicate requests)
+    fetch(config.path + 'lqip.json')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) { if (data) lqipCache[roomId] = data; })
+      .catch(function() {});  // silently ignore missing lqip.json
   }
 
   function createGalleryWallTexture() {
@@ -182,6 +207,20 @@ var KRKAI_Rooms = (function() {
 
   // ── init ───────────────────────────────────────────────────────────────
   function init() {
+    // Try to load rooms-manifest.json for up-to-date room list + photo counts.
+    // Falls back to the hardcoded ROOM_CONFIG if the fetch fails.
+    fetch('rooms-manifest.json')
+      .then(function(r) { return r.ok ? r.json() : null; })
+      .then(function(data) {
+        if (data && Array.isArray(data.rooms) && data.rooms.length) {
+          ROOM_CONFIG = data.rooms;
+        }
+        afterManifestLoaded();
+      })
+      .catch(function() { afterManifestLoaded(); });
+  }
+
+  function afterManifestLoaded() {
     buildRoomButtons();
     buildRoomSwitcher();
     setupExitButton();
@@ -270,9 +309,6 @@ var KRKAI_Rooms = (function() {
 
     var overlay = document.getElementById('room-overlay');
     if (overlay) overlay.classList.remove('hidden');
-
-    setProgress(0);
-    showLoading('Loading ' + config.label + '...');
     document.body.style.overflow = 'hidden';
 
     initRoomRenderer();
@@ -282,31 +318,28 @@ var KRKAI_Rooms = (function() {
     updateTourBtn();
     resetThumbs();
 
-    // Use cached photo list if already discovered via hover/scroll preload or prior session visit
-    var preload = roomPreloadCache[roomId];
-    var cachedUrls = roomPhotoCache[roomId] || (preload && preload.status === 'done' && preload.photoUrls);
-    if (cachedUrls) {
-      setProgress(100);
-      buildRoom(cachedUrls, config);
-      hideLoading();
-      setTimeout(function() { setProgress(0); }, 600);
-      animateRoom();
-      populateThumbs(cachedUrls);
-      return;
-    }
+    // Start fetching LQIP placeholders in the background (non-blocking).
+    fetchLqip(config);
 
-    loadRoomPhotos(config, function(photoUrls) {
-      if (loadingRoomId !== roomId) return;
-      roomPhotoCache[roomId] = photoUrls;  // cache for instant re-open
-      setProgress(100);
-      buildRoom(photoUrls, config);
-      hideLoading();
-      setTimeout(function() { setProgress(0); }, 600);
-      animateRoom();
-      populateThumbs(photoUrls);
-    }, function(found) {
-      setProgress(Math.round((found / MAX_PHOTOS) * 90));
-    });
+    // Build room geometry immediately from the known photo count — no waiting.
+    var entries = buildKnownPhotoList(config);
+    buildRoom(entries, config);
+    animateRoom();
+    hideLoading();
+
+    // Stream textures in progressively. Visible-wall frames load first.
+    // Cache resolved URLs so reopening the room is instant (zero network).
+    var cachedUrls = roomPhotoCache[roomId];
+    if (cachedUrls) {
+      populateThumbs(cachedUrls);
+    } else {
+      resolveAllPhotos(config, function(photoUrls) {
+        if (currentRoomId === roomId) {
+          roomPhotoCache[roomId] = photoUrls;
+          populateThumbs(photoUrls);
+        }
+      });
+    }
   }
 
   function switchRoom(roomId) {
@@ -431,8 +464,9 @@ var KRKAI_Rooms = (function() {
   }
 
   // ── room geometry ──────────────────────────────────────────────────────
-  function buildRoom(photoUrls, config) {
-    var count = photoUrls.length;
+  // entries: array of { num, avif, webp, fallback } from buildKnownPhotoList()
+  function buildRoom(entries, config) {
+    var count = entries.length;
     if (count === 0) { showLoading('No photos found in this room yet.'); return; }
 
     var perWall    = Math.ceil(count / 4);
@@ -521,7 +555,7 @@ var KRKAI_Rooms = (function() {
 
       for (var f=0; f<photosOnWall; f++) {
         var localX = startX + f*(FRAME_WIDTH+FRAME_GAP);
-        placePhoto(photoUrls[photoIndex], wi, localX, halfLen, frameMat, photoIndex, roomLabel);
+        placePhoto(entries[photoIndex], wi, localX, halfLen, frameMat, photoIndex, roomLabel);
 
         if (lightCount < MAX_LIGHTS) {
           var lp = getFramePosition(wi, localX, halfLen);
@@ -561,10 +595,19 @@ var KRKAI_Rooms = (function() {
     return { x:0, y:FRAME_Y, z:0 };
   }
 
-  function placePhoto(url, wallIndex, localX, halfLen, frameMat, idx, roomLabel) {
-    var off        = 0.03;
+  // entry: { num, avif, webp, fallback } from buildKnownPhotoList(), or a plain URL string
+  //        (plain string used when re-opening from roomPhotoCache)
+  function placePhoto(entry, wallIndex, localX, halfLen, frameMat, idx, roomLabel) {
+    var off     = 0.03;
     var frameGroup = new THREE.Group();
-    var fallbackCanvas = createRoomPhotoCanvas();
+
+    // Use LQIP blur-up placeholder if available — shows blurry colour hint while real thumb loads.
+    var lqipDataUrl = null;
+    if (typeof entry === 'object' && entry.num) {
+      var lqipRoom = lqipCache[currentRoomId];
+      if (lqipRoom) lqipDataUrl = lqipRoom[String(entry.num)] || null;
+    }
+    var fallbackCanvas = createRoomPhotoCanvas(lqipDataUrl);
     var fallbackTex    = new THREE.CanvasTexture(fallbackCanvas);
     fallbackTex.minFilter = THREE.LinearFilter;
 
@@ -572,18 +615,43 @@ var KRKAI_Rooms = (function() {
       new THREE.PlaneGeometry(FRAME_WIDTH, FRAME_HEIGHT),
       new THREE.MeshBasicMaterial({ map: fallbackTex, side: THREE.DoubleSide })
     );
-    // Hidden until the real photo texture loads successfully
-    photoMesh.visible = false;
+    // Show the dark placeholder immediately — user sees the frame while texture loads.
+    photoMesh.visible = true;
     frameGroup.add(photoMesh);
 
-    // Capture the room at load-start time; discard callback if room changed
+    // Determine load URL: either a plain string (cached reopen) or an entry object.
+    // Camera-facing wall (wall 0) gets priority — its textures load before other walls.
     var expectedRoom = currentRoomId;
-    loadRoomImageTexture(url, function(tex) {
+    var isFront      = (wallIndex === 0);
+    var primaryUrl   = (typeof entry === 'string') ? entry : (entry.webp || entry.fallback);
+
+    function loadTex() {
+      if (typeof entry === 'string') {
+        loadRoomImageTexture(entry, onTexReady, fallbackCanvas);
+      } else {
+        // Try AVIF first (smaller), fall back to WebP thumbnail, then full-res WebP
+        resolvePhotoSrc(entry, function(resolvedUrl) {
+          if (!resolvedUrl) return;  // genuinely missing — placeholder stays
+          loadRoomImageTexture(resolvedUrl, onTexReady, fallbackCanvas);
+        });
+      }
+    }
+
+    function onTexReady(tex) {
       if (currentRoomId !== expectedRoom) { tex.dispose(); return; }
       photoMesh.material.dispose();
       photoMesh.material = new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide });
-      photoMesh.visible = true;
-    }, fallbackCanvas);
+    }
+
+    // Front wall loads immediately; other walls are deferred by one rAF tick
+    // so the renderer gets a chance to paint the first frame before background loading starts.
+    if (isFront) {
+      loadTex();
+    } else {
+      setTimeout(loadTex, 0);
+    }
+
+    var url = primaryUrl;  // for frameMeshes metadata
 
     function createRoomFrameBar(w,h,d,x,y,z,mat) {
       var bar = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), mat);
@@ -1052,85 +1120,68 @@ var KRKAI_Rooms = (function() {
     btn.classList.toggle('active', soundEnabled);
   }
 
-  // ── photo loading ──────────────────────────────────────────────────────
-  // Pool-based parallel loader — 6 concurrent slots instead of sequential one-at-a-time.
-  // Reduces load time by ~6-8x (50 photos in ~9 batches vs 50 serial loads).
-  function loadRoomPhotos(config, callback, onProgress) {
-    var isMobile   = window.innerWidth < 768;
-    var thumbDir   = isMobile ? 'thumbs-sm/' : 'thumbs/';
-    var POOL       = isMobile ? 6 : 10;  // HTTP/2 supports more concurrent requests on desktop
-    var found      = [];                 // { num, src } objects, sorted at end
-    var queue      = [];                 // photo numbers still to fetch
-    var active     = 0;
-    var finalized  = false;
-
-    for (var n = 1; n <= MAX_PHOTOS; n++) queue.push(n);
-
-    function processQueue() {
-      while (active < POOL && queue.length > 0) loadPhoto(queue.shift());
-      if (active === 0 && queue.length === 0 && !finalized) {
-        finalized = true;
-        found.sort(function(a, b) { return a.num - b.num; });
-        callback(found.map(function(p) { return p.src; }));
-      }
+  // ── photo URL generation ───────────────────────────────────────────────
+  // Generates the photo URL list instantly from the manifest count — no network probing.
+  // Falls back to AVIF thumbnails first, then WebP. Full-res WebP/JPG/PNG as last resort.
+  function buildKnownPhotoList(config) {
+    var isMobile = window.innerWidth < 768;
+    var thumbDir = isMobile ? 'thumbs-sm/' : 'thumbs/';
+    var count    = config.count || MAX_PHOTOS;
+    var urls     = [];
+    for (var n = 1; n <= count; n++) {
+      // Prefer AVIF (smallest), fall back to WebP thumbnail, then full-res WebP
+      urls.push({
+        num:      n,
+        avif:     config.path + thumbDir + n + '.avif',
+        webp:     config.path + thumbDir + n + '.webp',
+        fallback: config.path + n + '.webp'
+      });
     }
+    return urls;
+  }
 
-    function loadPhoto(num) {
-      active++;
-      var thumbSrc = config.path + thumbDir + num + '.webp';  // resized thumbnail (primary)
-      var webpSrc  = config.path + num + '.webp';              // original WebP fallback
-      var jpgSrc   = config.path + num + '.jpg';
-      var pngSrc   = config.path + num + '.png';
-
-      var img = new Image();
-      img.onload = function() {
-        found.push({ num: num, src: thumbSrc });
-        if (onProgress) onProgress(found.length);
-        active--;
-        processQueue();
-      };
-      img.onerror = function() {
-        // Thumbnail not found — fall back to original WebP
-        var imgW = new Image();
-        imgW.onload = function() {
-          found.push({ num: num, src: webpSrc });
-          if (onProgress) onProgress(found.length);
-          active--;
-          processQueue();
+  // Resolves the best available URL for a single photo slot.
+  // Tries AVIF → WebP thumb → full-res WebP → JPG → PNG.
+  function resolvePhotoSrc(entry, onResolved) {
+    var img = new Image();
+    img.onload = function() { onResolved(entry.avif); };
+    img.onerror = function() {
+      var img2 = new Image();
+      img2.onload = function() { onResolved(entry.webp); };
+      img2.onerror = function() {
+        var img3 = new Image();
+        img3.onload = function() { onResolved(entry.fallback); };
+        img3.onerror = function() {
+          // Try JPG / PNG variants of the original
+          var jpgSrc = entry.fallback.replace('.webp', '.jpg');
+          var img4 = new Image();
+          img4.onload = function() { onResolved(jpgSrc); };
+          img4.onerror = function() { onResolved(null); };  // photo genuinely missing
+          img4.src = jpgSrc;
         };
-        imgW.onerror = function() {
-          // Original WebP not found — fall back to JPG
-          var img1 = new Image();
-          img1.onload = function() {
-            found.push({ num: num, src: jpgSrc });
-            if (onProgress) onProgress(found.length);
-            active--;
-            processQueue();
-          };
-          img1.onerror = function() {
-            // JPG not found — fall back to PNG
-            var img2 = new Image();
-            img2.onload = function() {
-              found.push({ num: num, src: pngSrc });
-              if (onProgress) onProgress(found.length);
-              active--;
-              processQueue();
-            };
-            img2.onerror = function() { active--; processQueue(); };
-            img2.src = pngSrc;
-          };
-          img1.src = jpgSrc;
-        };
-        imgW.src = webpSrc;
+        img3.src = entry.fallback;
       };
-      img.src = thumbSrc;
-    }
+      img2.src = entry.webp;
+    };
+    img.src = entry.avif;
+  }
 
-    processQueue();
+  // Silent background preload helper — resolves all URLs without building the room.
+  function resolveAllPhotos(config, callback) {
+    var entries   = buildKnownPhotoList(config);
+    var resolved  = new Array(entries.length);
+    var remaining = entries.length;
+    entries.forEach(function(entry, i) {
+      resolvePhotoSrc(entry, function(src) {
+        resolved[i] = src;
+        remaining--;
+        if (remaining === 0) callback(resolved.filter(Boolean));
+      });
+    });
   }
 
   // Silent background preload — called on hover or scroll into view.
-  // Discovers photo URLs and caches them so openRoom() skips the loading phase.
+  // Resolves photo URLs and caches them so openRoom() skips the probe phase.
   function preloadRoom(roomId) {
     if (roomPreloadCache[roomId]) return;  // already loading or done
     var config = null;
@@ -1139,10 +1190,10 @@ var KRKAI_Rooms = (function() {
     }
     if (!config) return;
     roomPreloadCache[roomId] = { status: 'loading' };
-    loadRoomPhotos(config, function(photoUrls) {
+    resolveAllPhotos(config, function(photoUrls) {
       roomPreloadCache[roomId] = { status: 'done', photoUrls: photoUrls };
       roomPhotoCache[roomId]   = photoUrls;
-    }, function() {});  // no progress UI during silent preload
+    });
   }
 
   // ── animate loop ───────────────────────────────────────────────────────

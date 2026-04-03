@@ -452,25 +452,46 @@ void main() {
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlasCanvas);
     gl.generateMipmap(gl.TEXTURE_2D);
 
-    Promise.all(this.items.map(function(item) {
-      return new Promise(function(resolve) {
-        var img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload  = function() { resolve(img); };
-        img.onerror = function() { resolve(null); };
-        img.src = item.image;
+    // Load images in batches of 25 — first batch appears quickly, rest stream in.
+    // Each batch paints into the shared canvas atlas and re-uploads to GPU.
+    var BATCH = 25;
+    function loadBatch(startIdx) {
+      var endIdx = Math.min(startIdx + BATCH, self.items.length);
+      var batchPromises = [];
+      for (var b = startIdx; b < endIdx; b++) {
+        (function(i) {
+          batchPromises.push(new Promise(function(resolve) {
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload  = function() { resolve({ img: img, idx: i }); };
+            img.onerror = function() { resolve(null); };
+            img.src = self.items[i].image;
+          }));
+        })(b);
+      }
+      Promise.all(batchPromises).then(function(results) {
+        results.forEach(function(r) {
+          if (!r) return;
+          var x = (r.idx % atlasSize) * cellSize;
+          var y = Math.floor(r.idx / atlasSize) * cellSize;
+          ctx.drawImage(r.img, x, y, cellSize, cellSize);
+        });
+        // Upload updated atlas to GPU after each batch
+        gl.bindTexture(gl.TEXTURE_2D, self.tex);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlasCanvas);
+        gl.generateMipmap(gl.TEXTURE_2D);
+
+        // Schedule next batch with idle callback to avoid blocking rendering
+        if (endIdx < self.items.length) {
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(function() { loadBatch(endIdx); }, { timeout: 500 });
+          } else {
+            setTimeout(function() { loadBatch(endIdx); }, 50);
+          }
+        }
       });
-    })).then(function(images) {
-      images.forEach(function(img, i) {
-        if (!img) return;
-        var x = (i % atlasSize) * cellSize;
-        var y = Math.floor(i / atlasSize) * cellSize;
-        ctx.drawImage(img, x, y, cellSize, cellSize);
-      });
-      gl.bindTexture(gl.TEXTURE_2D, self.tex);
-      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlasCanvas);
-      gl.generateMipmap(gl.TEXTURE_2D);
-    });
+    }
+    loadBatch(0);
   };
   InfiniteGridMenu.prototype.resize = function() {
     var gl = this.gl;

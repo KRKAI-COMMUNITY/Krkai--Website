@@ -1,8 +1,14 @@
 {
+  "scripts": {
+    "build": "node scripts/build.js",
+    "build:images": "node scripts/resize-images.js",
+    "build:images:force": "node scripts/resize-images.js --force"
+  },
   "dependencies": {
     "puppeteer": "^24.39.1"
   },
   "devDependencies": {
-    "sharp": "^0.34.5"
+    "sharp": "^0.34.5",
+    "terser": "^5.46.1"
   }
 }

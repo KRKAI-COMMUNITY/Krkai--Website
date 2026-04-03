@@ -1,0 +1,7 @@
+{
+  "rooms": [
+    { "id": "porur-1",         "label": "Porur 1",         "path": "images/rooms/porur-1/",         "count": 63 },
+    { "id": "porur-2",         "label": "Porur 2",         "path": "images/rooms/porur-2/",         "count": 11 },
+    { "id": "chembarambakkam", "label": "Chembarambakkam", "path": "images/rooms/Chembarambakkam/", "count": 27 }
+  ]
+}

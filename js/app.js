@@ -199,7 +199,49 @@
   // === SERVICE WORKER ===
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', function() {
-      navigator.serviceWorker.register('/sw.js');
+      navigator.serviceWorker.register('./sw.js').then(function(reg) {
+        // After SW is active and controlling the page, trigger silent pre-cache of all
+        // room thumbnails so the next visit opens every room instantly (zero network).
+        function triggerPrecache(sw) {
+          if (!sw) return;
+          // Only run on idle to avoid competing with visible content loads
+          var run = function() {
+            fetch('rooms-manifest.json')
+              .then(function(r) { return r.ok ? r.json() : null; })
+              .then(function(data) {
+                if (!data || !Array.isArray(data.rooms)) return;
+                var isMobile = window.innerWidth < 768;
+                var thumbDir = isMobile ? 'thumbs-sm/' : 'thumbs/';
+                var urls = [];
+                data.rooms.forEach(function(room) {
+                  for (var n = 1; n <= (room.count || 50); n++) {
+                    urls.push(room.path + thumbDir + n + '.avif');
+                    urls.push(room.path + thumbDir + n + '.webp');
+                  }
+                });
+                sw.postMessage({ type: 'precache', urls: urls });
+              })
+              .catch(function() {});
+          };
+          if (typeof requestIdleCallback !== 'undefined') {
+            requestIdleCallback(run, { timeout: 5000 });
+          } else {
+            setTimeout(run, 3000);
+          }
+        }
+
+        var sw = reg.active || (reg.installing || reg.waiting);
+        if (reg.active) {
+          triggerPrecache(reg.active);
+        } else {
+          reg.addEventListener('updatefound', function() {
+            var newSw = reg.installing;
+            newSw.addEventListener('statechange', function() {
+              if (newSw.state === 'activated') triggerPrecache(newSw);
+            });
+          });
+        }
+      }).catch(function() {});
     });
   }
 
