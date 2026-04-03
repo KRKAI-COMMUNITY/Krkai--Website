@@ -196,6 +196,13 @@
     target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
+  // === SERVICE WORKER ===
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', function() {
+      navigator.serviceWorker.register('/sw.js');
+    });
+  }
+
   // === START ===
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initApp);

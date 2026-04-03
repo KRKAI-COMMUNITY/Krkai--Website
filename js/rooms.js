@@ -42,6 +42,11 @@ var KRKAI_Rooms = (function() {
   var isTweening   = false;
   var roomCanvas   = null;         // cached once to avoid getElementById in hot path
 
+  // Session-scoped caches — survive room close for instant re-open
+  var textureCache     = {};  // url → THREE.Texture (kept alive across room closes)
+  var roomPhotoCache   = {};  // roomId → photoUrls[] (skip rediscovery on reopen)
+  var roomPreloadCache = {};  // roomId → { status: 'loading'|'done', photoUrls:[] }
+
   // Default camera pose
   var DEFAULT_POS    = { x: 0, y: 1.6, z: 1.5 };
   var DEFAULT_TARGET = { x: 0, y: 1.6, z: 0 };
@@ -79,10 +84,12 @@ var KRKAI_Rooms = (function() {
   }
 
   function loadRoomImageTexture(src, onLoad, fallbackCanvas) {
-    // src already contains ?v= cache-bust from loadRoomPhotos
+    // Return cached texture immediately — avoids re-downloading on room reopen
+    if (textureCache[src]) { onLoad(textureCache[src]); return; }
     var loader = new THREE.TextureLoader();
     loader.load(src, function(tex) {
       tex.minFilter = THREE.LinearFilter;
+      textureCache[src] = tex;  // store for reuse across room sessions
       onLoad(tex);
     }, undefined, function() {
       var img = new Image();
@@ -181,6 +188,21 @@ var KRKAI_Rooms = (function() {
     setupResizeHandler();
     setupNavButtons();
     setupMinimap();
+
+    // Scroll preload — start loading the first room silently when the
+    // Stories section scrolls into view, giving a head start before any hover.
+    if (typeof IntersectionObserver !== 'undefined') {
+      var scrollTarget = document.getElementById('room-buttons');
+      if (scrollTarget && ROOM_CONFIG.length > 0) {
+        var obs = new IntersectionObserver(function(entries) {
+          if (entries[0].isIntersecting) {
+            preloadRoom(ROOM_CONFIG[0].id);
+            obs.disconnect();
+          }
+        }, { threshold: 0.3 });
+        obs.observe(scrollTarget);
+      }
+    }
   }
 
   function buildRoomButtons() {
@@ -192,6 +214,10 @@ var KRKAI_Rooms = (function() {
       btn.textContent = ROOM_CONFIG[i].label;
       btn.setAttribute('data-room', ROOM_CONFIG[i].id);
       btn.addEventListener('click', onRoomClick);
+      // Hover preload — start fetching images before the user clicks
+      (function(roomId) {
+        btn.addEventListener('mouseenter', function() { preloadRoom(roomId); });
+      })(ROOM_CONFIG[i].id);
       container.appendChild(btn);
     }
   }
@@ -256,8 +282,22 @@ var KRKAI_Rooms = (function() {
     updateTourBtn();
     resetThumbs();
 
+    // Use cached photo list if already discovered via hover/scroll preload or prior session visit
+    var preload = roomPreloadCache[roomId];
+    var cachedUrls = roomPhotoCache[roomId] || (preload && preload.status === 'done' && preload.photoUrls);
+    if (cachedUrls) {
+      setProgress(100);
+      buildRoom(cachedUrls, config);
+      hideLoading();
+      setTimeout(function() { setProgress(0); }, 600);
+      animateRoom();
+      populateThumbs(cachedUrls);
+      return;
+    }
+
     loadRoomPhotos(config, function(photoUrls) {
       if (loadingRoomId !== roomId) return;
+      roomPhotoCache[roomId] = photoUrls;  // cache for instant re-open
       setProgress(100);
       buildRoom(photoUrls, config);
       hideLoading();
@@ -298,7 +338,9 @@ var KRKAI_Rooms = (function() {
       scene.traverse(function(obj) {
         if (obj.geometry) obj.geometry.dispose();
         if (obj.material) {
-          if (obj.material.map) obj.material.map.dispose();
+          // Skip disposing textures in the session cache — they'll be reused on room reopen
+          var map = obj.material.map;
+          if (map && !(map.image && textureCache[map.image.src])) map.dispose();
           obj.material.dispose();
         }
       });
@@ -1014,10 +1056,11 @@ var KRKAI_Rooms = (function() {
   // Pool-based parallel loader — 6 concurrent slots instead of sequential one-at-a-time.
   // Reduces load time by ~6-8x (50 photos in ~9 batches vs 50 serial loads).
   function loadRoomPhotos(config, callback, onProgress) {
-    var bust       = '?v=' + Date.now();
-    var POOL       = 6;           // concurrent request slots
-    var found      = [];          // { num, src } objects, sorted at end
-    var queue      = [];          // photo numbers still to fetch
+    var isMobile   = window.innerWidth < 768;
+    var thumbDir   = isMobile ? 'thumbs-sm/' : 'thumbs/';
+    var POOL       = isMobile ? 6 : 10;  // HTTP/2 supports more concurrent requests on desktop
+    var found      = [];                 // { num, src } objects, sorted at end
+    var queue      = [];                 // photo numbers still to fetch
     var active     = 0;
     var finalized  = false;
 
@@ -1034,46 +1077,72 @@ var KRKAI_Rooms = (function() {
 
     function loadPhoto(num) {
       active++;
-      var webpSrc = config.path + num + '.webp' + bust;
-      var jpgSrc  = config.path + num + '.jpg'  + bust;
-      var pngSrc  = config.path + num + '.png'  + bust;
+      var thumbSrc = config.path + thumbDir + num + '.webp';  // resized thumbnail (primary)
+      var webpSrc  = config.path + num + '.webp';              // original WebP fallback
+      var jpgSrc   = config.path + num + '.jpg';
+      var pngSrc   = config.path + num + '.png';
+
       var img = new Image();
       img.onload = function() {
-        found.push({ num: num, src: webpSrc });
+        found.push({ num: num, src: thumbSrc });
         if (onProgress) onProgress(found.length);
         active--;
         processQueue();
       };
       img.onerror = function() {
-        // WebP not found — fall back to JPG
-        var img1 = new Image();
-        img1.onload = function() {
-          found.push({ num: num, src: jpgSrc });
+        // Thumbnail not found — fall back to original WebP
+        var imgW = new Image();
+        imgW.onload = function() {
+          found.push({ num: num, src: webpSrc });
           if (onProgress) onProgress(found.length);
           active--;
           processQueue();
         };
-        img1.onerror = function() {
-          // JPG not found — fall back to PNG
-          var img2 = new Image();
-          img2.onload = function() {
-            found.push({ num: num, src: pngSrc });
+        imgW.onerror = function() {
+          // Original WebP not found — fall back to JPG
+          var img1 = new Image();
+          img1.onload = function() {
+            found.push({ num: num, src: jpgSrc });
             if (onProgress) onProgress(found.length);
             active--;
             processQueue();
           };
-          img2.onerror = function() {
-            active--;
-            processQueue();
+          img1.onerror = function() {
+            // JPG not found — fall back to PNG
+            var img2 = new Image();
+            img2.onload = function() {
+              found.push({ num: num, src: pngSrc });
+              if (onProgress) onProgress(found.length);
+              active--;
+              processQueue();
+            };
+            img2.onerror = function() { active--; processQueue(); };
+            img2.src = pngSrc;
           };
-          img2.src = pngSrc;
+          img1.src = jpgSrc;
         };
-        img1.src = jpgSrc;
+        imgW.src = webpSrc;
       };
-      img.src = webpSrc;
+      img.src = thumbSrc;
     }
 
     processQueue();
+  }
+
+  // Silent background preload — called on hover or scroll into view.
+  // Discovers photo URLs and caches them so openRoom() skips the loading phase.
+  function preloadRoom(roomId) {
+    if (roomPreloadCache[roomId]) return;  // already loading or done
+    var config = null;
+    for (var i = 0; i < ROOM_CONFIG.length; i++) {
+      if (ROOM_CONFIG[i].id === roomId) { config = ROOM_CONFIG[i]; break; }
+    }
+    if (!config) return;
+    roomPreloadCache[roomId] = { status: 'loading' };
+    loadRoomPhotos(config, function(photoUrls) {
+      roomPreloadCache[roomId] = { status: 'done', photoUrls: photoUrls };
+      roomPhotoCache[roomId]   = photoUrls;
+    }, function() {});  // no progress UI during silent preload
   }
 
   // ── animate loop ───────────────────────────────────────────────────────
