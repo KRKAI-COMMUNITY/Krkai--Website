@@ -16,6 +16,17 @@ var KRKAI_Scene = (function() {
   var bloomPass; // reference for dynamic threshold adjustments
   var bokehPass = null;
 
+  // === HARDWARE TIER (set by perf.js, loaded before this script) ===
+  var _tier = window.KRKAI_PerfTier || (isMobile ? 'low' : 'high');
+  var _tierSettings = (window.KRKAI_TierSettings && window.KRKAI_TierSettings[_tier]) || {
+    fpsTarget: isMobile ? 30 : 60,
+    pixelRatioMax: isMobile ? 1.0 : 1.5,
+    shadows: !isMobile,
+    bloom:   !isMobile,
+    fxaa:    !isMobile,
+    bokeh:   !isMobile
+  };
+
   var AMBIENT_COUNT = _pc ? (isMobile ? _pc.ambient.countMobile : (isTablet ? _pc.ambient.countTablet : _pc.ambient.countDesktop)) : (isMobile ? 30 : (isTablet ? 50 : 100));
 
   // === SMOOTH CAMERA SYSTEM ===
@@ -29,7 +40,7 @@ var KRKAI_Scene = (function() {
 
   // === FPS LIMITER ===
   var lastFrameTime = 0;
-  var targetFPS = isMobile ? 30 : 60;
+  var targetFPS = _tierSettings.fpsTarget;
   var frameDuration = 1000 / targetFPS;
   var deltaTime = 0.016; // default 60fps frame time in seconds
 
@@ -37,8 +48,8 @@ var KRKAI_Scene = (function() {
   var fpsFrameCount = 0;
   var fpsAccumulator = 0;
   var _isMobileDevice = /Mobi|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-  var perfBloomDisabled = _isMobileDevice; // always off on mobile
-  var perfFxaaDisabled  = _isMobileDevice; // always off on mobile
+  var perfBloomDisabled = !_tierSettings.bloom;  // off on mobile and low/ultra-low tiers
+  var perfFxaaDisabled  = !_tierSettings.fxaa;   // off on mobile and low/ultra-low tiers
 
   // Reusable temp vector (avoid per-frame allocations)
   var _scTmpV = new THREE.Vector3();
@@ -356,11 +367,11 @@ var KRKAI_Scene = (function() {
     var canvas = document.getElementById('three-canvas');
     if (!canvas) return;
 
-    // Renderer
-    var pixelRatio = isMobile ? 1.0 : Math.min(window.devicePixelRatio, 1.5);
+    // Renderer — pixel ratio and antialias from hardware tier
+    var pixelRatio = Math.min(window.devicePixelRatio, _tierSettings.pixelRatioMax);
     renderer = new THREE.WebGLRenderer({
       canvas: canvas,
-      antialias: !isMobile,
+      antialias: (_tier === 'high' || _tier === 'mid'),
       alpha: false,
       powerPreference: 'high-performance',
       preserveDrawingBuffer: false
@@ -371,8 +382,8 @@ var KRKAI_Scene = (function() {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.9;  // matches p<0.05 target — no first-frame flash
 
-    // === MINIMAL SHADOWS (desktop only, spotlight only) ===
-    if (!isMobile) {
+    // === MINIMAL SHADOWS (tier-based — disabled on low/ultra-low) ===
+    if (_tierSettings.shadows) {
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     }
@@ -394,8 +405,15 @@ var KRKAI_Scene = (function() {
     buildButterflyParticles();
     buildFlowerParticles();
 
-    // === POST-PROCESSING PIPELINE (desktop only) ===
-    if (!isMobile && typeof THREE.EffectComposer !== 'undefined') {
+    // === BAKE STATIC SHADOW MAP (render once — geometry never moves) ===
+    if (_tierSettings.shadows && renderer.shadowMap.enabled) {
+      renderer.shadowMap.autoUpdate  = false;
+      renderer.shadowMap.needsUpdate = true;  // forces one render on first frame
+    }
+
+    // === POST-PROCESSING PIPELINE (tier-based) ===
+    var _usePP = (_tier === 'high' || _tier === 'mid') && typeof THREE.EffectComposer !== 'undefined';
+    if (_usePP) {
       composer = new THREE.EffectComposer(renderer);
       composer.addPass(new THREE.RenderPass(scene, camera));
 
@@ -406,8 +424,8 @@ var KRKAI_Scene = (function() {
       bloomPass.enabled = false;  // disabled until strength > 0 (saves a full render pass)
       composer.addPass(bloomPass);
 
-      // === DEPTH OF FIELD (BokehPass) — cinematic shallow DOF, skip on mobile ===
-      if (!_isMobileDevice && typeof THREE.BokehPass !== 'undefined' && typeof THREE.BokehShader !== 'undefined') {
+      // === DEPTH OF FIELD (BokehPass) — high tier only ===
+      if (_tierSettings.bokeh && !_isMobileDevice && typeof THREE.BokehPass !== 'undefined' && typeof THREE.BokehShader !== 'undefined') {
         try {
           bokehPass = new THREE.BokehPass(scene, camera, {
             focus: 2.0,
@@ -420,12 +438,14 @@ var KRKAI_Scene = (function() {
         }
       }
 
-      // FXAA — fast anti-aliasing pass (resolution must account for pixel ratio)
-      var fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
-      var fxaaW = window.innerWidth * pixelRatio;
-      var fxaaH = window.innerHeight * pixelRatio;
-      fxaaPass.material.uniforms['resolution'].value.set(1 / fxaaW, 1 / fxaaH);
-      composer.addPass(fxaaPass);
+      // FXAA — fast anti-aliasing pass (high/mid tier only)
+      if (_tierSettings.fxaa && typeof THREE.FXAAShader !== 'undefined') {
+        var fxaaPass = new THREE.ShaderPass(THREE.FXAAShader);
+        var fxaaW = window.innerWidth * pixelRatio;
+        var fxaaH = window.innerHeight * pixelRatio;
+        fxaaPass.material.uniforms['resolution'].value.set(1 / fxaaW, 1 / fxaaH);
+        composer.addPass(fxaaPass);
+      }
     }
 
     // === PAUSE WHEN TAB IS HIDDEN ===
@@ -1718,19 +1738,15 @@ var KRKAI_Scene = (function() {
         );
         frameGroup.add(canvasMesh);
 
-        // Try loading the real image (upgrades poster if it works)
+        // Try loading the real image — swap texture on existing material (avoids shader recompile)
         loadImageTexture(p.src, function(tex) {
           tex.encoding = THREE.sRGBEncoding;
-          tex.needsUpdate = true;
-          canvasMesh.material.dispose();
-          canvasMesh.material = new THREE.MeshStandardMaterial({
-            map: tex,
-            roughness: 0.2,
-            metalness: 0.0,
-            emissive: new THREE.Color(1, 1, 1),
-            emissiveMap: tex,
-            emissiveIntensity: 0.10  // low enough to stay below bloom threshold
-          });
+          canvasMesh.material.map = tex;
+          canvasMesh.material.emissiveMap = tex;
+          canvasMesh.material.roughness = 0.2;
+          canvasMesh.material.emissive.set(1, 1, 1);
+          canvasMesh.material.emissiveIntensity = 0.10;
+          canvasMesh.material.needsUpdate = true;  // update textures only, no shader recompile
         }, fallback);
 
         // Frame border bars
@@ -1770,46 +1786,164 @@ var KRKAI_Scene = (function() {
     return bar;
   }
 
-  // === AMBIENT PARTICLES ===
+  // === GPU PARTICLE SHADER SOURCES ===
+  // Shared between all particle systems. Vertex shader computes position on GPU —
+  // the only data uploaded per frame is the 'time' uniform (4 bytes).
+  var _gpuVertexShader = [
+    'attribute vec3 initialPos;',
+    'attribute vec3 gpuVel;',       // drift velocities (stored as speed, not per-frame delta)
+    'attribute float phase;',        // random phase offset per particle
+    'attribute float driftX;',       // XZ oscillation radius
+    'attribute float driftZ;',
+    'uniform float time;',
+    'uniform float uSize;',
+    'uniform float uScale;',         // viewport scale (innerHeight * 0.5) for sizeAttenuation
+    'uniform float uSizeBreath;',    // breathing amplitude (0 = no breathing)
+    'uniform float uSizeBreathSpd;', // breathing speed (radians/sec)
+    'void main() {',
+    '  vec3 pos;',
+    // XZ: sinusoidal oscillation around initial cluster position
+    '  pos.x = initialPos.x + sin(time * gpuVel.x + phase) * driftX;',
+    '  pos.z = initialPos.z + cos(time * gpuVel.z + phase * 0.9) * driftZ;',
+    // Y: upward drift with modular wrap (0.3 to 5.5 = 5.2 units range)
+    '  float yRange  = 5.2;',
+    '  float yDrift  = mod(time * gpuVel.y + phase * yRange, yRange);',
+    '  pos.y = 0.3 + yDrift;',
+    // Size breathing
+    '  float breathe = 1.0 + sin(time * uSizeBreathSpd + phase) * uSizeBreath;',
+    '  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);',
+    '  gl_PointSize = uSize * breathe * uScale / (-mvPos.z);',
+    '  gl_Position  = projectionMatrix * mvPos;',
+    '}'
+  ].join('\n');
+
+  // Cluster-aware variant: particles orbit a cluster center (used for magical/butterfly/flower)
+  var _gpuClusterVertexShader = [
+    'attribute vec3 initialPos;',
+    'attribute vec3 clusterPos;',    // cluster center in world space
+    'attribute vec3 gpuVel;',        // orbit speed per axis
+    'attribute float phase;',
+    'attribute float driftX;',
+    'attribute float driftZ;',
+    'uniform float time;',
+    'uniform float uSize;',
+    'uniform float uScale;',
+    'uniform float uSizeBreath;',
+    'uniform float uSizeBreathSpd;',
+    'void main() {',
+    '  vec3 pos;',
+    // XZ: orbit around cluster center with multi-frequency sinusoids
+    '  pos.x = clusterPos.x + sin(time * gpuVel.x + phase) * driftX',
+    '        + sin(time * gpuVel.x * 2.1 + phase * 0.5) * driftX * 0.25;',
+    '  pos.z = clusterPos.z + cos(time * gpuVel.z + phase * 0.8) * driftZ',
+    '        + cos(time * gpuVel.z * 1.7 + phase * 1.3) * driftZ * 0.25;',
+    // Y: slow bob around cluster Y
+    '  float yBob   = sin(time * gpuVel.y + phase) * 0.5;',
+    '  float yRange  = 5.2;',
+    '  pos.y         = clamp(clusterPos.y + yBob, 0.2, 5.5);',
+    '  float breathe = 1.0 + sin(time * uSizeBreathSpd + phase) * uSizeBreath;',
+    '  vec4 mvPos = modelViewMatrix * vec4(pos, 1.0);',
+    '  gl_PointSize = uSize * breathe * uScale / (-mvPos.z);',
+    '  gl_Position  = projectionMatrix * mvPos;',
+    '}'
+  ].join('\n');
+
+  // Butterfly variant: cluster-attracted with wing-flap Y bobbing
+  var _gpuButterflyVertexShader = [
+    'attribute vec3 clusterPos;',
+    'attribute vec3 gpuVel;',
+    'attribute float phase;',
+    'attribute float driftX;',
+    'attribute float driftZ;',
+    'attribute float baseY;',
+    'uniform float time;',
+    'uniform float uSize;',
+    'uniform float uScale;',
+    'uniform float uFlapSpeed;',
+    'void main() {',
+    // Butterflies drift around cluster with damped oscillation
+    '  float px = clusterPos.x + sin(time * gpuVel.x + phase) * driftX',
+    '           + sin(time * gpuVel.x * 0.37 + phase * 1.7) * driftX * 0.4;',
+    '  float pz = clusterPos.z + cos(time * gpuVel.z + phase * 0.8) * driftZ',
+    '           + cos(time * gpuVel.z * 0.51 + phase * 0.6) * driftZ * 0.4;',
+    // Y: wing-flap bobbing
+    '  float py = baseY + sin(time * 2.5 + phase) * 0.18;',
+    // Wing-flap size variation (point size changes like a flapping wing)
+    '  float flap = 0.75 + sin(time * uFlapSpeed + phase) * 0.25;',
+    '  vec4 mvPos = modelViewMatrix * vec4(px, py, pz, 1.0);',
+    '  gl_PointSize = uSize * flap * uScale / (-mvPos.z);',
+    '  gl_Position  = projectionMatrix * mvPos;',
+    '}'
+  ].join('\n');
+
+  // Fragment shader: sample circle/sprite texture at gl_PointCoord
+  var _gpuFragShader = [
+    'uniform sampler2D uMap;',
+    'uniform float uOpacity;',
+    'void main() {',
+    '  vec4 texel = texture2D(uMap, gl_PointCoord);',
+    '  gl_FragColor = vec4(texel.rgb, texel.a * uOpacity);',
+    '  if (gl_FragColor.a < 0.01) discard;',
+    '}'
+  ].join('\n');
+
+  // === AMBIENT PARTICLES (GPU shader — zero per-frame CPU-to-GPU upload) ===
   function buildAmbientParticles() {
-    // Subtle dust motes — realistic floating dust in light
-    var pGeo = new THREE.BufferGeometry();
-    ambientPositions = new Float32Array(AMBIENT_COUNT * 3);
-    ambientVelocities = [];
-    var sizes = new Float32Array(AMBIENT_COUNT);
+    var geo = new THREE.BufferGeometry();
+    var iPos    = new Float32Array(AMBIENT_COUNT * 3);
+    var gVel    = new Float32Array(AMBIENT_COUNT * 3);
+    var phase   = new Float32Array(AMBIENT_COUNT);
+    var driftXA = new Float32Array(AMBIENT_COUNT);
+    var driftZA = new Float32Array(AMBIENT_COUNT);
 
     for (var i = 0; i < AMBIENT_COUNT; i++) {
-      // 60% clustered, 40% spread loosely for atmosphere
+      // 60% clustered, 40% spread loosely for atmosphere (same distribution as before)
       if (Math.random() < 0.6) {
         var cl = MAGIC_CLUSTERS_GLOBAL[Math.floor(Math.random() * MAGIC_CLUSTERS_GLOBAL.length)];
-        ambientPositions[i * 3]     = cl.x + (Math.random() - 0.5) * 1.6;
-        ambientPositions[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 1.0;
-        ambientPositions[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.6;
+        iPos[i * 3]     = cl.x;
+        iPos[i * 3 + 1] = cl.y;
+        iPos[i * 3 + 2] = cl.z;
+        driftXA[i] = 0.5 + Math.random() * 1.1;
+        driftZA[i] = 0.5 + Math.random() * 1.1;
       } else {
-        ambientPositions[i * 3]     = (Math.random() - 0.5) * 8;
-        ambientPositions[i * 3 + 1] = 0.5 + Math.random() * 4.5;
-        ambientPositions[i * 3 + 2] = (Math.random() - 0.5) * 6;
+        iPos[i * 3]     = (Math.random() - 0.5) * 8;
+        iPos[i * 3 + 1] = 0.5 + Math.random() * 4.5;
+        iPos[i * 3 + 2] = (Math.random() - 0.5) * 6;
+        driftXA[i] = 1.0 + Math.random() * 2.0;
+        driftZA[i] = 1.0 + Math.random() * 2.0;
       }
-      ambientVelocities.push({
-        x: (Math.random() - 0.5) * 0.002,
-        y: (Math.random() * 0.004) + 0.001,
-        z: (Math.random() - 0.5) * 0.002
-      });
-      sizes[i] = Math.random() * 0.8 + 0.3;
+      gVel[i * 3]     = (0.08 + Math.random() * 0.12) * (Math.random() < 0.5 ? 1 : -1); // X orbit speed
+      gVel[i * 3 + 1] = 0.001 + Math.random() * 0.003;  // Y rise speed
+      gVel[i * 3 + 2] = (0.08 + Math.random() * 0.12) * (Math.random() < 0.5 ? 1 : -1); // Z orbit speed
+      phase[i] = Math.random() * Math.PI * 2;
     }
-    pGeo.setAttribute('position', new THREE.BufferAttribute(ambientPositions, 3));
 
-    var pMat = new THREE.PointsMaterial({
-      color: 0xFFAA55,
-      size: isMobile ? 0.01 : 0.015,
-      transparent: true,
-      opacity: 0.22,
-      map: createCircleTexture(),
-      blending: THREE.AdditiveBlending,
-      depthWrite: false
+    // Only position is needed for geometry (ShaderMaterial ignores it, but Three.js needs it)
+    geo.setAttribute('position',  new THREE.BufferAttribute(iPos,    3));
+    geo.setAttribute('initialPos',new THREE.BufferAttribute(iPos,    3));
+    geo.setAttribute('gpuVel',    new THREE.BufferAttribute(gVel,    3));
+    geo.setAttribute('phase',     new THREE.BufferAttribute(phase,   1));
+    geo.setAttribute('driftX',    new THREE.BufferAttribute(driftXA, 1));
+    geo.setAttribute('driftZ',    new THREE.BufferAttribute(driftZA, 1));
+
+    var mat = new THREE.ShaderMaterial({
+      uniforms: {
+        time:          { value: 0 },
+        uSize:         { value: isMobile ? 0.01 : 0.015 },
+        uScale:        { value: window.innerHeight * 0.5 },
+        uSizeBreath:   { value: 0.15 },
+        uSizeBreathSpd:{ value: 0.5 },
+        uMap:          { value: createCircleTexture() },
+        uOpacity:      { value: 0.22 }
+      },
+      vertexShader:   _gpuVertexShader,
+      fragmentShader: _gpuFragShader,
+      transparent:    true,
+      blending:       THREE.AdditiveBlending,
+      depthWrite:     false
     });
 
-    ambientParticles = new THREE.Points(pGeo, pMat);
+    ambientParticles = new THREE.Points(geo, mat);
     scene.add(ambientParticles);
   }
 
@@ -1838,70 +1972,71 @@ var KRKAI_Scene = (function() {
     { x: -1.0, y: 5.5, z: -3.0 }    // 20: Ceiling back-left
   ];
 
-  // === GOLDEN BOKEH PARTICLES ===
+  // === GOLDEN BOKEH PARTICLES (GPU shader) ===
   var magicalParticles = null;
-  var magicalPositions, magicalVelocities, magicalPhases;
   var _pc = (typeof KRKAI_ParticleConfig !== 'undefined') ? KRKAI_ParticleConfig : null;
   var MAGICAL_COUNT = _pc ? (isMobile ? _pc.magical.countMobile : (isTablet ? _pc.magical.countTablet : _pc.magical.countDesktop)) : (isMobile ? 15 : (isTablet ? 50 : 200));
 
   function buildMagicalParticles() {
-    var mGeo = new THREE.BufferGeometry();
-    magicalPositions = new Float32Array(MAGICAL_COUNT * 3);
-    magicalVelocities = [];
-    magicalPhases = new Float32Array(MAGICAL_COUNT);
+    var geo    = new THREE.BufferGeometry();
+    var cPos   = new Float32Array(MAGICAL_COUNT * 3); // cluster centers
+    var iPos   = new Float32Array(MAGICAL_COUNT * 3); // initial positions (for position attr)
+    var gVel   = new Float32Array(MAGICAL_COUNT * 3);
+    var phase  = new Float32Array(MAGICAL_COUNT);
+    var driftX = new Float32Array(MAGICAL_COUNT);
+    var driftZ = new Float32Array(MAGICAL_COUNT);
 
     for (var i = 0; i < MAGICAL_COUNT; i++) {
       var cl = MAGIC_CLUSTERS_GLOBAL[Math.floor(Math.random() * MAGIC_CLUSTERS_GLOBAL.length)];
-      magicalPositions[i * 3]     = cl.x + (Math.random() - 0.5) * 1.6;
-      magicalPositions[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 1.0;
-      magicalPositions[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.6;
-      magicalVelocities.push({
-        x: (Math.random() - 0.5) * 0.003,
-        y: Math.random() * 0.0015 + 0.0004,
-        z: (Math.random() - 0.5) * 0.003
-      });
-      magicalPhases[i] = Math.random() * Math.PI * 2;
+      cPos[i * 3]     = cl.x;
+      cPos[i * 3 + 1] = cl.y;
+      cPos[i * 3 + 2] = cl.z;
+      iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 1.6;
+      iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 1.0;
+      iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.6;
+      gVel[i * 3]     = 0.10 + Math.random() * 0.15;
+      gVel[i * 3 + 1] = 0.25 + Math.random() * 0.25;
+      gVel[i * 3 + 2] = 0.10 + Math.random() * 0.15;
+      phase[i]  = Math.random() * Math.PI * 2;
+      driftX[i] = 0.8 + Math.random() * 1.2;
+      driftZ[i] = 0.8 + Math.random() * 1.2;
     }
-    mGeo.setAttribute('position', new THREE.BufferAttribute(magicalPositions, 3));
 
-    var mMat = new THREE.PointsMaterial({
-      color: 0xFFD700,
-      size: isMobile ? 0.04 : 0.060,
-      transparent: true,
-      opacity: 0.45,
-      map: createCircleTexture(),
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-      sizeAttenuation: true
+    geo.setAttribute('position',   new THREE.BufferAttribute(iPos,   3));
+    geo.setAttribute('clusterPos', new THREE.BufferAttribute(cPos,   3));
+    geo.setAttribute('gpuVel',     new THREE.BufferAttribute(gVel,   3));
+    geo.setAttribute('phase',      new THREE.BufferAttribute(phase,  1));
+    geo.setAttribute('driftX',     new THREE.BufferAttribute(driftX, 1));
+    geo.setAttribute('driftZ',     new THREE.BufferAttribute(driftZ, 1));
+
+    var mat = new THREE.ShaderMaterial({
+      uniforms: {
+        time:          { value: 0 },
+        uSize:         { value: isMobile ? 0.04 : 0.058 },
+        uScale:        { value: window.innerHeight * 0.5 },
+        uSizeBreath:   { value: 0.30 },
+        uSizeBreathSpd:{ value: 0.55 },
+        uMap:          { value: createCircleTexture() },
+        uOpacity:      { value: 0.45 }
+      },
+      vertexShader:   _gpuClusterVertexShader,
+      fragmentShader: _gpuFragShader,
+      transparent:    true,
+      blending:       THREE.AdditiveBlending,
+      depthWrite:     false
     });
-    magicalParticles = new THREE.Points(mGeo, mMat);
+    magicalParticles = new THREE.Points(geo, mat);
     magicalParticles.renderOrder = 1;
     scene.add(magicalParticles);
   }
 
   function updateMagicalParticles(time) {
     if (!magicalParticles || progress > 0.91) return;
-    for (var i = 0; i < MAGICAL_COUNT; i++) {
-      var idx = i * 3;
-      magicalPositions[idx]     += magicalVelocities[i].x;
-      magicalPositions[idx + 1] += magicalVelocities[i].y;
-      magicalPositions[idx + 2] += magicalVelocities[i].z;
-      // Wrap back to cluster when drifted too far
-      var cl = MAGIC_CLUSTERS_GLOBAL[i % MAGIC_CLUSTERS_GLOBAL.length];
-      if (Math.abs(magicalPositions[idx] - cl.x) > 2.5)     magicalVelocities[i].x *= -1;
-      if (magicalPositions[idx + 1] > 5.5 || magicalPositions[idx + 1] < 0.2) magicalVelocities[i].y *= -1;
-      if (Math.abs(magicalPositions[idx + 2] - cl.z) > 2.5) magicalVelocities[i].z *= -1;
-    }
-    magicalParticles.geometry.attributes.position.needsUpdate = true;
-    // Size breathing — single sin per frame (all bokeh pulse together for cohesive look)
-    magicalParticles.material.size = (isMobile ? 0.04 : 0.058) * (1.0 + Math.sin(time * 0.55) * 0.30);
+    magicalParticles.material.uniforms.time.value = time;
   }
 
-  // === BUTTERFLY PARTICLES ===
-  // 3 size variants: [small, medium, large]
+  // === BUTTERFLY PARTICLES (GPU shader — 3 size variants) ===
   var butterflyMeshes = [];
-  var butterflyPositions = [];
-  var butterflyVels = [];
   var butterflyCounts = [];
   var BUTTERFLY_COUNT = _pc ? (isMobile ? _pc.butterflies.countMobile : (isTablet ? _pc.butterflies.countTablet : _pc.butterflies.countDesktop)) : (isMobile ? 0 : (isTablet ? 25 : 80));
   var _cachedButterflyTex = null;
@@ -1968,39 +2103,62 @@ var KRKAI_Scene = (function() {
     var cntLarge = BUTTERFLY_COUNT - cntSmall - cntMed;
     butterflyCounts = [cntSmall, cntMed, cntLarge];
 
-    var sizes = [0.14, 0.24, 0.36];
+    var sizes      = [0.14, 0.24, 0.36];
+    var flapSpeeds = [6.0, 5.0, 3.5];
     var btex = createButterflyTexture();
     // Exclude desk area cluster (index 7) — butterflies stay near walls
     var wallClusters = MAGIC_CLUSTERS_GLOBAL.filter(function(c, idx) { return idx !== 7; });
 
     for (var s = 0; s < 3; s++) {
       var cnt = butterflyCounts[s];
-      var pos = new Float32Array(cnt * 3);
-      var vels = [];
-      butterflyPositions.push(pos);
-      butterflyVels.push(vels);
+      var cPos   = new Float32Array(cnt * 3); // cluster centers
+      var iPos   = new Float32Array(cnt * 3); // placeholder position attr
+      var gVel   = new Float32Array(cnt * 3);
+      var phase  = new Float32Array(cnt);
+      var driftX = new Float32Array(cnt);
+      var driftZ = new Float32Array(cnt);
+      var baseYA = new Float32Array(cnt);
 
       for (var i = 0; i < cnt; i++) {
         var cl = wallClusters[Math.floor(Math.random() * wallClusters.length)];
-        pos[i * 3]     = cl.x + (Math.random() - 0.5) * 1.4;
-        pos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.9;
-        pos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.4;
-        vels.push({
-          vx: (Math.random() - 0.5) * 0.005,
-          vz: (Math.random() - 0.5) * 0.005,
-          phase: Math.random() * Math.PI * 2,
-          clusterX: cl.x, clusterY: cl.y, clusterZ: cl.z,
-          baseY: pos[i * 3 + 1]
-        });
+        cPos[i * 3]     = cl.x;
+        cPos[i * 3 + 1] = cl.y;
+        cPos[i * 3 + 2] = cl.z;
+        iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 1.4;
+        iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.9;
+        iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.4;
+        gVel[i * 3]     = 0.25 + Math.random() * 0.20;
+        gVel[i * 3 + 1] = 1.0;  // unused, butterflies use baseY
+        gVel[i * 3 + 2] = 0.25 + Math.random() * 0.20;
+        phase[i]  = Math.random() * Math.PI * 2;
+        driftX[i] = 0.5 + Math.random() * 0.8;
+        driftZ[i] = 0.5 + Math.random() * 0.8;
+        baseYA[i] = iPos[i * 3 + 1];
       }
 
       var geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      var mat = new THREE.PointsMaterial({
-        color: 0xFF9935, size: sizes[s],
-        transparent: true, opacity: 0.82,
-        map: btex, blending: THREE.AdditiveBlending,
-        depthWrite: false, sizeAttenuation: true
+      geo.setAttribute('position',   new THREE.BufferAttribute(iPos,   3));
+      geo.setAttribute('clusterPos', new THREE.BufferAttribute(cPos,   3));
+      geo.setAttribute('gpuVel',     new THREE.BufferAttribute(gVel,   3));
+      geo.setAttribute('phase',      new THREE.BufferAttribute(phase,  1));
+      geo.setAttribute('driftX',     new THREE.BufferAttribute(driftX, 1));
+      geo.setAttribute('driftZ',     new THREE.BufferAttribute(driftZ, 1));
+      geo.setAttribute('baseY',      new THREE.BufferAttribute(baseYA, 1));
+
+      var mat = new THREE.ShaderMaterial({
+        uniforms: {
+          time:       { value: 0 },
+          uSize:      { value: sizes[s] },
+          uScale:     { value: window.innerHeight * 0.5 },
+          uFlapSpeed: { value: flapSpeeds[s] },
+          uMap:       { value: btex },
+          uOpacity:   { value: 0.82 }
+        },
+        vertexShader:   _gpuButterflyVertexShader,
+        fragmentShader: _gpuFragShader,
+        transparent:    true,
+        blending:       THREE.AdditiveBlending,
+        depthWrite:     false
       });
       var mesh = new THREE.Points(geo, mat);
       mesh.renderOrder = 3;
@@ -2011,42 +2169,15 @@ var KRKAI_Scene = (function() {
 
   function updateButterflyParticles(time) {
     if (butterflyMeshes.length === 0 || progress > 0.91) return;
-    var flapSpeeds = [6.0, 5.0, 3.5];
-    var baseSizes  = [0.14, 0.24, 0.36];
-
-    for (var s = 0; s < 3; s++) {
-      var mesh = butterflyMeshes[s];
-      if (!mesh) continue;
-      var pos  = butterflyPositions[s];
-      var vels = butterflyVels[s];
-      var cnt  = butterflyCounts[s];
-
-      for (var i = 0; i < cnt; i++) {
-        var idx = i * 3;
-        var bv = vels[i];
-        pos[idx]     += bv.vx;
-        pos[idx + 2] += bv.vz;
-        pos[idx + 1]  = bv.baseY + Math.sin(time * 2.5 + bv.phase) * 0.18;
-        var driftX = bv.clusterX - pos[idx];
-        var driftZ = bv.clusterZ - pos[idx + 2];
-        bv.vx += driftX * 0.0002;
-        bv.vz += driftZ * 0.0002;
-        bv.vx *= 0.985;
-        bv.vz *= 0.985;
+    for (var s = 0; s < butterflyMeshes.length; s++) {
+      if (butterflyMeshes[s]) {
+        butterflyMeshes[s].material.uniforms.time.value = time;
       }
-      mesh.geometry.attributes.position.needsUpdate = true;
-      // Wing-flap speed varies by size: small flaps faster, large slower
-      var wingFlap = baseSizes[s] * (0.75 + Math.sin(time * flapSpeeds[s]) * 0.25);
-      mesh.material.size = wingFlap;
     }
   }
 
-  // === MAGICAL FLOWER PARTICLES ===
-  // 3 size variants: [small, medium, large]
+  // === MAGICAL FLOWER PARTICLES (GPU shader — 3 size variants) ===
   var flowerMeshes = [];
-  var flowerPositions = [];
-  var flowerBaseYs = [];
-  var flowerPhasesList = [];
   var flowerCounts = [];
   var FLOWER_COUNT = _pc ? (isMobile ? _pc.flowers.countMobile : (isTablet ? _pc.flowers.countTablet : _pc.flowers.countDesktop)) : (isMobile ? 0 : (isTablet ? 30 : 120));
   var _cachedFlowerTex = null;
@@ -2107,34 +2238,58 @@ var KRKAI_Scene = (function() {
     var cntLarge = FLOWER_COUNT - cntSmall - cntMed;
     flowerCounts = [cntSmall, cntMed, cntLarge];
 
-    var sizes = [0.12, 0.22, 0.34];
+    var sizes       = [0.12, 0.22, 0.34];
+    var breathSpeeds= [1.4,  1.2,  0.9];
     var ftex = createFlowerTexture();
 
     for (var s = 0; s < 3; s++) {
       var cnt = flowerCounts[s];
-      var pos  = new Float32Array(cnt * 3);
-      var baseY = new Float32Array(cnt);
-      var phases = new Float32Array(cnt);
-      flowerPositions.push(pos);
-      flowerBaseYs.push(baseY);
-      flowerPhasesList.push(phases);
+      var cPos   = new Float32Array(cnt * 3);
+      var iPos   = new Float32Array(cnt * 3);
+      var gVel   = new Float32Array(cnt * 3);
+      var phase  = new Float32Array(cnt);
+      var driftX = new Float32Array(cnt);
+      var driftZ = new Float32Array(cnt);
 
       for (var i = 0; i < cnt; i++) {
         var cl = MAGIC_CLUSTERS_GLOBAL[Math.floor(Math.random() * MAGIC_CLUSTERS_GLOBAL.length)];
-        pos[i * 3]     = cl.x + (Math.random() - 0.5) * 0.90;
-        pos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.70;
-        pos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 0.90;
-        baseY[i]  = pos[i * 3 + 1];
-        phases[i] = Math.random() * Math.PI * 2;
+        cPos[i * 3]     = cl.x;
+        cPos[i * 3 + 1] = cl.y;
+        cPos[i * 3 + 2] = cl.z;
+        iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 0.90;
+        iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.70;
+        iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 0.90;
+        gVel[i * 3]     = 0.05 + Math.random() * 0.08;
+        gVel[i * 3 + 1] = breathSpeeds[s];  // Y bob speed
+        gVel[i * 3 + 2] = 0.05 + Math.random() * 0.08;
+        phase[i]  = Math.random() * Math.PI * 2;
+        driftX[i] = 0.2 + Math.random() * 0.3;  // flowers drift less than magical
+        driftZ[i] = 0.2 + Math.random() * 0.3;
       }
 
       var geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      var mat = new THREE.PointsMaterial({
-        color: 0xCC66FF, size: sizes[s],
-        transparent: true, opacity: 0.55,
-        map: ftex, blending: THREE.AdditiveBlending,
-        depthWrite: false, sizeAttenuation: true
+      geo.setAttribute('position',   new THREE.BufferAttribute(iPos,   3));
+      geo.setAttribute('clusterPos', new THREE.BufferAttribute(cPos,   3));
+      geo.setAttribute('gpuVel',     new THREE.BufferAttribute(gVel,   3));
+      geo.setAttribute('phase',      new THREE.BufferAttribute(phase,  1));
+      geo.setAttribute('driftX',     new THREE.BufferAttribute(driftX, 1));
+      geo.setAttribute('driftZ',     new THREE.BufferAttribute(driftZ, 1));
+
+      var mat = new THREE.ShaderMaterial({
+        uniforms: {
+          time:          { value: 0 },
+          uSize:         { value: sizes[s] },
+          uScale:        { value: window.innerHeight * 0.5 },
+          uSizeBreath:   { value: 0.15 },
+          uSizeBreathSpd:{ value: breathSpeeds[s] * 0.75 },
+          uMap:          { value: ftex },
+          uOpacity:      { value: 0.55 }
+        },
+        vertexShader:   _gpuClusterVertexShader,
+        fragmentShader: _gpuFragShader,
+        transparent:    true,
+        blending:       THREE.AdditiveBlending,
+        depthWrite:     false
       });
       var mesh = new THREE.Points(geo, mat);
       mesh.renderOrder = 2;
@@ -2145,26 +2300,10 @@ var KRKAI_Scene = (function() {
 
   function updateFlowerParticles(time) {
     if (flowerMeshes.length === 0 || progress > 0.91) return;
-    var baseSizes = [0.12, 0.22, 0.34];
-    // Each size group breathes at a slightly different rate for organic feel
-    var breathSpeeds = [1.4, 1.2, 0.9];
-
-    for (var s = 0; s < 3; s++) {
-      var mesh = flowerMeshes[s];
-      if (!mesh) continue;
-      var pos    = flowerPositions[s];
-      var baseY  = flowerBaseYs[s];
-      var phases = flowerPhasesList[s];
-      var cnt    = flowerCounts[s];
-
-      for (var i = 0; i < cnt; i++) {
-        pos[i * 3 + 1] = baseY[i] + Math.sin(time * 0.8 + phases[i]) * 0.07;
+    for (var s = 0; s < flowerMeshes.length; s++) {
+      if (flowerMeshes[s]) {
+        flowerMeshes[s].material.uniforms.time.value = time;
       }
-      mesh.geometry.attributes.position.needsUpdate = true;
-      var opBreath = 0.40 + Math.sin(time * breathSpeeds[s]) * 0.15;
-      mesh.material.opacity = opBreath;
-      var sBreath = baseSizes[s] * (0.85 + Math.sin(time * breathSpeeds[s] * 0.75) * 0.15);
-      mesh.material.size = sBreath;
     }
   }
 
@@ -2175,24 +2314,9 @@ var KRKAI_Scene = (function() {
 
   // === UPDATE PER FRAME ===
   function updateAmbientParticles(time) {
-    if (progress > 0.91) return; // canvas faded out, skip particle updates
-    for (var i = 0; i < AMBIENT_COUNT; i++) {
-      var idx = i * 3;
-      ambientPositions[idx] += ambientVelocities[i].x;
-      ambientPositions[idx + 1] += ambientVelocities[i].y;
-      ambientPositions[idx + 2] += ambientVelocities[i].z;
-
-      // Wrap around room bounds
-      if (ambientPositions[idx] > 4.5 || ambientPositions[idx] < -4.5) ambientVelocities[i].x *= -1;
-      if (ambientPositions[idx + 1] > 5.5 || ambientPositions[idx + 1] < 0.3) ambientVelocities[i].y *= -1;
-      if (ambientPositions[idx + 2] > 3.5 || ambientPositions[idx + 2] < -3.5) ambientVelocities[i].z *= -1;
-    }
-    ambientParticles.geometry.attributes.position.needsUpdate = true;
-
-    // === PARTICLE SIZE BREATHING ===
-    if (time) {
-      var breathe = 1.0 + Math.sin(time * 0.5) * 0.15;
-      ambientParticles.material.size = (isMobile ? 0.01 : 0.015) * breathe;
+    // GPU shader: only update the time uniform — zero CPU-to-GPU vertex upload
+    if (ambientParticles && progress <= 0.91) {
+      ambientParticles.material.uniforms.time.value = time;
     }
   }
 
@@ -2485,7 +2609,7 @@ var KRKAI_Scene = (function() {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     renderer.setSize(w, h);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 1.5));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, _tierSettings.pixelRatioMax));
 
     // Update post-processing pipeline on resize
     if (composer) {

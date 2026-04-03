@@ -17,18 +17,38 @@
 
 'use strict';
 
-var CACHE      = 'krkai-images-v3';
-var MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;  // 7 days
+var CACHE        = 'krkai-images-v3';
+var STATIC_CACHE = 'krkai-static-v2';   // versioned static assets (JS/CSS bundles)
+var MAX_AGE_MS   = 7 * 24 * 60 * 60 * 1000;  // 7 days
 
-self.addEventListener('install', function() {
+// Static assets served from cache-first, no TTL expiry (cache-busted via ?v= query param)
+var STATIC_ASSETS = [
+  'dist/js/three-bundle.min.js',
+  'dist/js/perf.js',
+  'dist/js/particles.config.js',
+  'dist/js/scene.js',
+  'dist/js/scroll.js',
+  'dist/js/pen.js',
+  'dist/css/styles.css',
+  'dist/css/animations.css'
+];
+
+self.addEventListener('install', function(e) {
   self.skipWaiting();  // activate immediately without waiting for existing tabs to close
+  // Pre-cache static JS/CSS bundles on install so they're available offline immediately
+  e.waitUntil(
+    caches.open(STATIC_CACHE).then(function(cache) {
+      return cache.addAll(STATIC_ASSETS).catch(function() {});  // ignore failures (offline install)
+    })
+  );
 });
 
 self.addEventListener('activate', function(e) {
+  var validCaches = [CACHE, STATIC_CACHE];
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(k) { return k !== CACHE; }).map(function(k) { return caches.delete(k); })
+        keys.filter(function(k) { return !validCaches.includes(k); }).map(function(k) { return caches.delete(k); })
       );
     }).then(function() { return self.clients.claim(); })
   );
@@ -37,6 +57,24 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   var url = e.request.url;
   if (e.request.method !== 'GET') return;
+
+  // Cache-first for static JS/CSS bundles (versioned via ?v= query param)
+  var pathname = new URL(url).pathname;
+  var isStaticAsset = STATIC_ASSETS.some(function(a) { return pathname.endsWith(a.replace(/^\.?\//, '').split('?')[0]); });
+  if (isStaticAsset) {
+    e.respondWith(
+      caches.open(STATIC_CACHE).then(function(cache) {
+        return cache.match(e.request).then(function(cached) {
+          if (cached) return cached;
+          return fetch(e.request).then(function(response) {
+            if (response && response.status === 200) cache.put(e.request, response.clone());
+            return response;
+          });
+        });
+      })
+    );
+    return;
+  }
 
   // Cache room thumbnails and gallery images
   var isRoomAsset    = url.includes('/images/rooms/');

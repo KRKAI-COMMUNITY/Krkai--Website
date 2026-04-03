@@ -2077,6 +2077,7 @@ h2 {
   position: fixed;
   inset: 0;
   z-index: 3;
+  contain: layout style paint;
   pointer-events: none;
   overflow: hidden;
   opacity: 0;
@@ -2092,6 +2093,7 @@ h2 {
   box-shadow: 0 0 8px 2px rgba(255,215,0,0.5), 0 0 20px 4px rgba(212,175,55,0.2);
   animation: fireflyFloat var(--dur) ease-in-out infinite;
   animation-delay: var(--del);
+  will-change: transform;
 }
 
 /* === 6. DREAMY MIST FOG === */
@@ -2101,6 +2103,7 @@ h2 {
   z-index: 3;
   pointer-events: none;
   overflow: hidden;
+  contain: layout style paint;
   opacity: 0;
   transition: opacity 2.5s ease;
 }
@@ -2124,6 +2127,7 @@ h2 {
   z-index: 3;
   pointer-events: none;
   overflow: hidden;
+  contain: layout style paint;
   opacity: 0;
   transition: opacity 2s ease;
 }
@@ -2134,6 +2138,7 @@ h2 {
   border-radius: 50% 50% 50% 10%;
   animation: petalFall var(--dur) linear infinite;
   animation-delay: var(--del);
+  will-change: transform;
 }
 .petal-purple {
   width: 10px;

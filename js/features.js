@@ -96,16 +96,30 @@ var KRKAI_Features = (function() {
     if (!btn) return;
 
     btn.addEventListener('click', function() {
-      generatePDF();
+      // Lazy-load jsPDF only when the user actually clicks download
+      if (typeof window.jspdf !== 'undefined') {
+        generatePDF();
+        return;
+      }
+      btn.textContent = 'Loading…';
+      btn.disabled = true;
+      var s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = function() {
+        btn.textContent = 'Download PDF';
+        btn.disabled = false;
+        generatePDF();
+      };
+      s.onerror = function() {
+        btn.textContent = 'Download PDF';
+        btn.disabled = false;
+        alert('Could not load PDF library. Please check your internet connection.');
+      };
+      document.head.appendChild(s);
     });
   }
 
   function generatePDF() {
-    if (typeof window.jspdf === 'undefined' && typeof jspdf === 'undefined') {
-      alert('PDF library is loading. Please try again.');
-      return;
-    }
-
     var jsPDF = window.jspdf ? window.jspdf.jsPDF : jspdf.jsPDF;
     var doc = new jsPDF();
 
