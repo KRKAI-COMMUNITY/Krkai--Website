@@ -1,6 +1,20 @@
 # Node dependencies — not needed for static hosting
 node_modules/
 
+# Original PNG/JPG source images — only WebP/AVIF served on site
+# (logo.png is kept — it has no WebP version and is used in HTML)
+images/3.png
+images/poster*.png
+images/rooms/**/*.jpg
+images/rooms/**/*.jpeg
+images/rooms/**/*.png
+gallery/*.jpg
+gallery/*.jpeg
+gallery/*.png
+
+# LQIP individual source files — lqip.json is generated from these, only JSON needed
+images/rooms/*/lqip/
+
 # Local desktop shortcut
 KRKAI.desktop
 
