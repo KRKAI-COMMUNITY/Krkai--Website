@@ -2535,7 +2535,9 @@ var KRKAI_Scene = (function() {
     deltaTime = Math.min(delta / 1000, 0.05);
 
     // Particles always animate — render every frame while 3D scene is active
-    var time = Date.now() * 0.001;
+    // Use performance.now() (seconds since page load, starts near 0) NOT Date.now()
+    // — GLSL 32-bit float loses precision at epoch time (~1.7e9), freezing GPU animations
+    var time = now * 0.001;
     particleThrottleFrame++;
 
     updateAmbientParticles(time);
