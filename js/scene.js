@@ -1838,7 +1838,7 @@ var KRKAI_Scene = (function() {
     '  pos.z = clusterPos.z + cos(time * gpuVel.z + phase * 0.8) * driftZ',
     '        + cos(time * gpuVel.z * 1.7 + phase * 1.3) * driftZ * 0.25;',
     // Y: slow bob around cluster Y
-    '  float yBob   = sin(time * gpuVel.y + phase) * 0.5;',
+    '  float yBob   = sin(time * gpuVel.y + phase) * 0.08;',
     '  float yRange  = 5.2;',
     '  pos.y         = clamp(clusterPos.y + yBob, 0.2, 5.5);',
     '  float breathe = 1.0 + sin(time * uSizeBreathSpd + phase) * uSizeBreath;',
@@ -2104,7 +2104,7 @@ var KRKAI_Scene = (function() {
     butterflyCounts = [cntSmall, cntMed, cntLarge];
 
     var sizes      = [0.14, 0.24, 0.36];
-    var flapSpeeds = [6.0, 5.0, 3.5];
+    var flapSpeeds = [2.5, 2.0, 1.5];
     var btex = createButterflyTexture();
     // Exclude desk area cluster (index 7) — butterflies stay near walls
     var wallClusters = MAGIC_CLUSTERS_GLOBAL.filter(function(c, idx) { return idx !== 7; });
@@ -2127,12 +2127,12 @@ var KRKAI_Scene = (function() {
         iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 1.4;
         iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.9;
         iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 1.4;
-        gVel[i * 3]     = 0.25 + Math.random() * 0.20;
+        gVel[i * 3]     = 0.08 + Math.random() * 0.07;
         gVel[i * 3 + 1] = 1.0;  // unused, butterflies use baseY
-        gVel[i * 3 + 2] = 0.25 + Math.random() * 0.20;
+        gVel[i * 3 + 2] = 0.08 + Math.random() * 0.07;
         phase[i]  = Math.random() * Math.PI * 2;
-        driftX[i] = 0.5 + Math.random() * 0.8;
-        driftZ[i] = 0.5 + Math.random() * 0.8;
+        driftX[i] = 0.20 + Math.random() * 0.20;
+        driftZ[i] = 0.20 + Math.random() * 0.20;
         baseYA[i] = iPos[i * 3 + 1];
       }
 
@@ -2259,12 +2259,12 @@ var KRKAI_Scene = (function() {
         iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 0.90;
         iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.70;
         iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 0.90;
-        gVel[i * 3]     = 0.05 + Math.random() * 0.08;
+        gVel[i * 3]     = 0.01 + Math.random() * 0.02;
         gVel[i * 3 + 1] = breathSpeeds[s];  // Y bob speed
-        gVel[i * 3 + 2] = 0.05 + Math.random() * 0.08;
+        gVel[i * 3 + 2] = 0.01 + Math.random() * 0.02;
         phase[i]  = Math.random() * Math.PI * 2;
-        driftX[i] = 0.2 + Math.random() * 0.3;  // flowers drift less than magical
-        driftZ[i] = 0.2 + Math.random() * 0.3;
+        driftX[i] = 0.03 + Math.random() * 0.05;  // flowers drift gently
+        driftZ[i] = 0.03 + Math.random() * 0.05;
       }
 
       var geo = new THREE.BufferGeometry();
