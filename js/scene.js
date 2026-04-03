@@ -2259,12 +2259,12 @@ var KRKAI_Scene = (function() {
         iPos[i * 3]     = cl.x + (Math.random() - 0.5) * 0.90;
         iPos[i * 3 + 1] = cl.y + (Math.random() - 0.5) * 0.70;
         iPos[i * 3 + 2] = cl.z + (Math.random() - 0.5) * 0.90;
-        gVel[i * 3]     = 0.01 + Math.random() * 0.02;
+        gVel[i * 3]     = 0.02 + Math.random() * 0.03;
         gVel[i * 3 + 1] = breathSpeeds[s];  // Y bob speed
-        gVel[i * 3 + 2] = 0.01 + Math.random() * 0.02;
+        gVel[i * 3 + 2] = 0.02 + Math.random() * 0.03;
         phase[i]  = Math.random() * Math.PI * 2;
-        driftX[i] = 0.03 + Math.random() * 0.05;  // flowers drift gently
-        driftZ[i] = 0.03 + Math.random() * 0.05;
+        driftX[i] = 0.25 + Math.random() * 0.25;  // spread like a bush, slow drift
+        driftZ[i] = 0.25 + Math.random() * 0.25;
       }
 
       var geo = new THREE.BufferGeometry();
