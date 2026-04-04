@@ -9,7 +9,7 @@ var KRKAI_ParticleConfig = {
 
   // ── GOLDEN BOKEH / MAGICAL DUST ─────────────────────────
   magical: {
-    countDesktop: 800,   // particles on desktop
+    countDesktop: 600,   // particles on desktop
     countTablet: 400,   // particles on tablet
     countMobile: 100,   // particles on mobile
     size: 0.058,  // base size in world units
@@ -20,9 +20,9 @@ var KRKAI_ParticleConfig = {
 
   // ── MAGICAL BUTTERFLIES ──────────────────────────────────
   butterflies: {
-    countDesktop: 300,    // total butterflies on desktop
+    countDesktop: 100,    // total butterflies on desktop
     countTablet: 150,    // total butterflies on tablet
-    countMobile: 75,    // butterflies on mobile (0 = disabled)
+    countMobile: 45,    // butterflies on mobile (0 = disabled)
     sizeSmall: 0.14,     // small variant base size
     sizeMed: 0.24,     // medium variant base size
     sizeLarge: 0.36,     // large variant base size
@@ -31,9 +31,9 @@ var KRKAI_ParticleConfig = {
 
   // ── MAGICAL FLOWERS ─────────────────────────────────────
   flowers: {
-    countDesktop: 1500,    // total flowers on desktop
+    countDesktop: 800,    // total flowers on desktop
     countTablet: 500,    // total flowers on tablet
-    countMobile: 250,    // flowers on mobile (0 = disabled)
+    countMobile: 100,    // flowers on mobile (0 = disabled)
     sizeSmall: 0.12,     // small variant base size
     sizeMed: 0.22,     // medium variant base size
     sizeLarge: 0.34,     // large variant base size
@@ -85,8 +85,8 @@ var KRKAI_ParticleConfig = {
   // entire room — like a dreamy enchanted atmosphere.
   fog: {
     enabled: true,      // set false to disable mist entirely
-    cloudCount: 6,     // number of mist clouds (5=light, 15=heavy)
-    cloudOpacity: 0.06, // base opacity of each cloud (0.05=faint, 0.50=thick)
+    cloudCount: 5,     // number of mist clouds (5=light, 15=heavy)
+    cloudOpacity: 0.05, // base opacity of each cloud (0.05=faint, 0.50=thick)
     blurMin: 15,        // minimum blur radius in px (higher = softer)
     blurMax: 35,        // maximum blur radius in px
     sizeMin: 500,       // smallest cloud width in px
@@ -100,7 +100,7 @@ var KRKAI_ParticleConfig = {
 
   // ── CSS FALLING PETALS (purple & gold) ─────────────────
   petals: {
-    count: 60,          // total petals (0 = disabled)
+    count: 30,          // total petals (0 = disabled)
     purpleRatio: 5.0,  // fraction that are purple (rest are gold)
     sizeMin: 10,        // smallest petal size in px
     sizeMax: 15,       // largest petal size in px
