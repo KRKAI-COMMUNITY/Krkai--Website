@@ -2530,11 +2530,11 @@ var KRKAI_Scene = (function() {
     var now = performance.now();
     var delta = now - lastFrameTime;
 
-    // === FPS CAP: skip frame if budget not exhausted yet ===
-    // Without this, every tier runs at full rAF speed (60fps on 60Hz, 144fps on 144Hz monitors).
+    // === FPS CAP: skip render work if budget not exhausted yet ===
+    // Line 2528 already called requestAnimationFrame(animate) unconditionally above,
+    // so just return here — do NOT call rAF again or callbacks double exponentially.
     // Carry-over (delta % frameDuration) prevents drift accumulation and micro-stutters.
     if (delta < frameDuration) {
-      requestAnimationFrame(animate);
       return;
     }
     lastFrameTime = now - (delta % frameDuration);
