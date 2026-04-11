@@ -18,7 +18,7 @@
 'use strict';
 
 var CACHE        = 'krkai-images-v3';
-var STATIC_CACHE = 'krkai-static-v2';   // versioned static assets (JS/CSS bundles)
+var STATIC_CACHE = 'krkai-static-v3';   // versioned static assets (JS/CSS bundles)
 var MAX_AGE_MS   = 7 * 24 * 60 * 60 * 1000;  // 7 days
 
 // Static assets served from cache-first, no TTL expiry (cache-busted via ?v= query param)
@@ -26,9 +26,18 @@ var STATIC_ASSETS = [
   'dist/js/three-bundle.min.js',
   'dist/js/perf.js',
   'dist/js/particles.config.js',
+  'dist/js/magical-overlays.js',
   'dist/js/scene.js',
   'dist/js/scroll.js',
   'dist/js/pen.js',
+  'dist/js/iniibo.js',
+  'dist/js/i18n.js',
+  'dist/js/features.js',
+  'dist/js/gl-matrix-min.js',
+  'dist/js/gallery.js',
+  'dist/js/rooms.js',
+  'dist/js/cursor.js',
+  'dist/js/app.js',
   'dist/css/styles.css',
   'dist/css/animations.css'
 ];

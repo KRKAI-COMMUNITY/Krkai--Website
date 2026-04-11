@@ -2529,7 +2529,15 @@ var KRKAI_Scene = (function() {
 
     var now = performance.now();
     var delta = now - lastFrameTime;
-    lastFrameTime = now;
+
+    // === FPS CAP: skip frame if budget not exhausted yet ===
+    // Without this, every tier runs at full rAF speed (60fps on 60Hz, 144fps on 144Hz monitors).
+    // Carry-over (delta % frameDuration) prevents drift accumulation and micro-stutters.
+    if (delta < frameDuration) {
+      requestAnimationFrame(animate);
+      return;
+    }
+    lastFrameTime = now - (delta % frameDuration);
 
     // Frame-rate independent delta time (capped at 50ms to prevent spiral)
     deltaTime = Math.min(delta / 1000, 0.05);
@@ -2581,12 +2589,15 @@ var KRKAI_Scene = (function() {
       renderer.render(scene, camera);
     }
 
-    // === AUTO-PERFORMANCE MONITOR (every 60 frames) ===
-    if (composer && !isMobile) {
+    // === AUTO-PERFORMANCE MONITOR (every 30 frames — 2× faster response than before) ===
+    // Skip for low/ultra-low: they have no composer passes to disable.
+    // Skip for mobile: uses isMobile flag as before.
+    var _skipAutoTune = (_tier === 'low' || _tier === 'ultra-low');
+    if (composer && !isMobile && !_skipAutoTune) {
       fpsFrameCount++;
       fpsAccumulator += delta;
-      if (fpsFrameCount >= 60) {
-        var avgFPS = 60000 / fpsAccumulator;
+      if (fpsFrameCount >= 30) {
+        var avgFPS = 30000 / fpsAccumulator;  // was 60000/60frames
         if (avgFPS < 35 && bokehPass && bokehPass.enabled) {
           bokehPass.enabled = false;
         }

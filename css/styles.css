@@ -156,6 +156,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   z-index: 0;
   transition: opacity 0.5s ease;
   image-rendering: auto;
+  will-change: transform;  /* Own GPU compositor layer — prevents recompositing with DOM elements */
 }
 
 /* === OVERLAYS === */
@@ -2156,5 +2157,24 @@ h2 {
   #firefly-overlay,
   #fog-overlay,
   #petal-overlay { display: none; }
+}
+
+/* ============================================================
+   CONTENT VISIBILITY — skip rendering off-screen sections
+   When the 3D hero is active, the browser was laying out,
+   painting, and compositing all normal sections even though
+   they are far below the viewport. content-visibility: auto
+   skips all that work (layout, paint, compositing, animations)
+   for any section not in or near the viewport.
+   Visual change: NONE — sections are identical when scrolled
+   into view. CSS animations in hidden sections are also paused
+   automatically, reducing compositor thread work.
+   ============================================================ */
+.normal-section {
+  content-visibility: auto;
+  /* contain-intrinsic-size: prevents layout shift (CLS) when sections
+     are skipped. 'auto' keyword makes browser remember the last known
+     rendered size; '700px' is the fallback estimate for first paint. */
+  contain-intrinsic-size: auto 700px;
 }
 

@@ -697,9 +697,12 @@
   <!-- Hardware tier detection — must load first so scene.js reads KRKAI_PerfTier -->
   <script src="dist/js/perf.js?v=1"></script>
   <!-- Three.js + GSAP local bundle (replaces 14 CDN requests with 1 local file) -->
+  <!-- Preload hint: browser starts download as soon as HTML head is parsed -->
+  <link rel="preload" as="script" href="dist/js/three-bundle.min.js?v=1">
   <script src="dist/js/three-bundle.min.js?v=1"></script>
   <script src="dist/js/particles.config.js?v=5"></script>
-  <script src="dist/js/magical-overlays.js?v=1"></script>
+  <!-- magical-overlays.js: called from app.js (deferred) — safe to defer -->
+  <script src="dist/js/magical-overlays.js?v=1" defer></script>
   <script src="dist/js/scene.js?v=14"></script>
   <script src="dist/js/pen.js?v=19"></script>
   <script src="dist/js/iniibo.js?v=6" defer></script>
@@ -707,8 +710,8 @@
   <script src="dist/js/scroll.js?v=13"></script>
   <script src="dist/js/i18n.js?v=7" defer></script>
   <script src="dist/js/features.js?v=6" defer></script>
-  <!-- gl-matrix for WebGL globe gallery (local copy) -->
-  <script src="dist/js/gl-matrix-min.js"></script>
+  <!-- gl-matrix for WebGL globe gallery — used by gallery.js (deferred), safe to defer -->
+  <script src="dist/js/gl-matrix-min.js" defer></script>
   <script src="dist/js/gallery.js?v=12" defer></script>
   <script src="dist/js/rooms.js?v=12" defer></script>
   <script src="dist/js/cursor.js?v=6" defer></script>
