@@ -18,7 +18,7 @@
 'use strict';
 
 var CACHE        = 'krkai-images-v3';
-var STATIC_CACHE = 'krkai-static-v3';   // versioned static assets (JS/CSS bundles)
+var STATIC_CACHE = 'krkai-static-v5';   // versioned static assets (JS/CSS bundles)
 var MAX_AGE_MS   = 7 * 24 * 60 * 60 * 1000;  // 7 days
 
 // Static assets served from cache-first, no TTL expiry (cache-busted via ?v= query param)

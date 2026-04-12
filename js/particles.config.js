@@ -9,9 +9,9 @@ var KRKAI_ParticleConfig = {
 
   // ── GOLDEN BOKEH / MAGICAL DUST ─────────────────────────
   magical: {
-    countDesktop: 600,   // particles on desktop
+    countDesktop: 200,   // particles on desktop
     countTablet: 400,   // particles on tablet
-    countMobile: 100,   // particles on mobile
+    countMobile: 50,   // particles on mobile
     size: 0.058,  // base size in world units
     sizeBreath: 0.30,   // breathing amplitude (0=static, 0.5=big pulse)
     opacity: 0.55,   // transparency (0=invisible, 1=solid)
@@ -42,9 +42,9 @@ var KRKAI_ParticleConfig = {
 
   // ── AMBIENT DUST MOTES ───────────────────────────────────
   ambient: {
-    countDesktop: 1000,    // dust motes on desktop
+    countDesktop: 300,    // dust motes on desktop
     countTablet: 1000,    // dust motes on tablet
-    countMobile: 500,    // dust motes on mobile
+    countMobile: 60,    // dust motes on mobile
     opacity: 0.22     // dust mote transparency
   },
 
@@ -55,8 +55,8 @@ var KRKAI_ParticleConfig = {
 
   // ── PEN TRAIL ────────────────────────────────────────────
   trail: {
-    countDesktop: 300,    // trail particle pool size on desktop
-    countMobile: 150,    // trail particle pool size on mobile
+    countDesktop: 150,    // trail particle pool size on desktop
+    countMobile: 50,    // trail particle pool size on mobile
     sizeDesktop: 0.01,    // particle size on desktop — large enough to be clearly visible
     sizeMobile: 0.01,    // particle size on mobile
     opacity: 1.0,     // trail transparency — fully opaque for max visibility

@@ -65,13 +65,20 @@ var KRKAI_Scene = (function() {
 
   // === FRAME-RATE INDEPENDENT EXPONENTIAL DAMPING ===
   function dampVal(current, target, speed, dt) {
-    return current + (target - current) * (1 - Math.exp(-speed * dt));
+    var diff = target - current;
+    if (diff > -0.0001 && diff < 0.0001) return target;
+    return current + diff * (1 - Math.exp(-speed * dt));
   }
   function dampVec3(vec, target, speed, dt) {
+    var dx = target.x - vec.x, dy = target.y - vec.y, dz = target.z - vec.z;
+    if (dx > -0.0001 && dx < 0.0001 && dy > -0.0001 && dy < 0.0001 && dz > -0.0001 && dz < 0.0001) {
+      vec.x = target.x; vec.y = target.y; vec.z = target.z;
+      return;
+    }
     var f = 1 - Math.exp(-speed * dt);
-    vec.x += (target.x - vec.x) * f;
-    vec.y += (target.y - vec.y) * f;
-    vec.z += (target.z - vec.z) * f;
+    vec.x += dx * f;
+    vec.y += dy * f;
+    vec.z += dz * f;
   }
 
   // === TEXTURE RESOLUTION ===
@@ -2529,17 +2536,7 @@ var KRKAI_Scene = (function() {
 
     var now = performance.now();
     var delta = now - lastFrameTime;
-
-    // === FPS CAP: skip render work if budget not exhausted yet ===
-    // Line 2528 already called requestAnimationFrame(animate) unconditionally above,
-    // so just return here — do NOT call rAF again or callbacks double exponentially.
-    // Carry-over (delta % frameDuration) prevents drift accumulation and micro-stutters.
-    if (delta < frameDuration) {
-      return;
-    }
-    lastFrameTime = now - (delta % frameDuration);
-
-    // Frame-rate independent delta time (capped at 50ms to prevent spiral)
+    lastFrameTime = now;
     deltaTime = Math.min(delta / 1000, 0.05);
 
     // Particles always animate — render every frame while 3D scene is active
@@ -2550,13 +2547,9 @@ var KRKAI_Scene = (function() {
 
     updateAmbientParticles(time);
     updateMagicalParticles(time);
-    // Butterflies bob at <2.5Hz, flowers breathe at <1.4Hz — every 2nd frame is imperceptible
-    if (particleThrottleFrame % 2 === 0) {
-      updateButterflyParticles(time);
-      updateFlowerParticles(time);
-    }
-    // Keep pen trail physics running every frame (not just on scroll events)
-    if (window.KRKAI_Pen && KRKAI_Pen.updateTrailPhysics) {
+    updateButterflyParticles(time);
+    updateFlowerParticles(time);
+    if (particleThrottleFrame % 2 === 0 && window.KRKAI_Pen && KRKAI_Pen.updateTrailPhysics) {
       KRKAI_Pen.updateTrailPhysics();
     }
     updateSceneState(progress, time);
