@@ -514,6 +514,13 @@ void main() {
   InfiniteGridMenu.prototype.stop = function() {
     if (this._rafId) { cancelAnimationFrame(this._rafId); this._rafId = null; }
   };
+  // Reusable temp objects for _animate loop (avoid per-frame/per-instance allocations)
+  var _aP = vec3.create();
+  var _aNeg = vec3.create();
+  var _aM = mat4.create();
+  var _aTmpMat = mat4.create();
+  var _aScale = vec3.create();
+
   InfiniteGridMenu.prototype._animate = function(dt) {
     var gl = this.gl;
     this.control.update(dt, this.TARGET_FRAME_DURATION);
@@ -522,16 +529,17 @@ void main() {
     var scale = 0.25;
     var R = this.SPHERE_RADIUS;
     for (var ndx = 0; ndx < this.instancePositions.length; ndx++) {
-      var p = vec3.transformQuat(vec3.create(), this.instancePositions[ndx], orient);
-      var s = (Math.abs(p[2]) / R) * SCALE_INTENSITY + (1 - SCALE_INTENSITY);
+      vec3.transformQuat(_aP, this.instancePositions[ndx], orient);
+      var s = (Math.abs(_aP[2]) / R) * SCALE_INTENSITY + (1 - SCALE_INTENSITY);
       var finalScale = s * scale;
-      var m = mat4.create();
-      var negP = vec3.negate(vec3.create(), p);
-      mat4.multiply(m, m, mat4.fromTranslation(mat4.create(), negP));
-      mat4.multiply(m, m, mat4.targetTo(mat4.create(), [0,0,0], p, [0,1,0]));
-      mat4.multiply(m, m, mat4.fromScaling(mat4.create(), [finalScale, finalScale, finalScale]));
-      mat4.multiply(m, m, mat4.fromTranslation(mat4.create(), [0, 0, -R]));
-      mat4.copy(this.discInstances.matrices[ndx], m);
+      mat4.identity(_aM);
+      vec3.negate(_aNeg, _aP);
+      mat4.multiply(_aM, _aM, mat4.fromTranslation(_aTmpMat, _aNeg));
+      mat4.multiply(_aM, _aM, mat4.targetTo(_aTmpMat, [0,0,0], _aP, [0,1,0]));
+      vec3.set(_aScale, finalScale, finalScale, finalScale);
+      mat4.multiply(_aM, _aM, mat4.fromScaling(_aTmpMat, _aScale));
+      mat4.multiply(_aM, _aM, mat4.fromTranslation(_aTmpMat, [0, 0, -R]));
+      mat4.copy(this.discInstances.matrices[ndx], _aM);
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, this.discInstances.buffer);
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.discInstances.matricesArray);

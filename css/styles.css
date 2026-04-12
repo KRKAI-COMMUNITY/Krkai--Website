@@ -75,7 +75,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 1px;
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
 }
 .btn-gold {
   background: var(--gold-foil);
@@ -200,7 +200,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   padding: 4px 12px;
   border-radius: 20px;
   font-size: 0.8rem;
-  transition: all 0.3s;
+  transition: color 0.3s, background 0.3s;
 }
 .lang-btn.active {
   color: var(--bg);
@@ -219,22 +219,22 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   background:
     var(--metal-brushed),
     linear-gradient(180deg, rgba(30,22,12,0.78) 0%, rgba(15,10,5,0.82) 100%);
-  backdrop-filter: blur(16px) saturate(140%);
-  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(212,168,86,0.08);
   box-shadow:
     0 1px 0 rgba(212,168,86,0.12),
     0 2px 20px rgba(0,0,0,0.45),
     inset 0 1px 0 rgba(255,240,160,0.06);
   transition: background 0.3s, box-shadow 0.3s;
-  will-change: backdrop-filter;
+  will-change: transform;
 }
 #navbar.scrolled {
   background:
     var(--metal-brushed),
     rgba(10,6,2,0.94);
-  backdrop-filter: blur(20px) saturate(160%);
-  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   box-shadow:
     0 1px 0 rgba(212,168,86,0.18),
     0 4px 30px rgba(0,0,0,0.55),
@@ -302,7 +302,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   width: 24px;
   height: 2px;
   background: var(--primary);
-  transition: all 0.3s;
+  transition: transform 0.3s, opacity 0.3s;
   border-radius: 1px;
 }
 #hamburger.open span:nth-child(1) { transform: rotate(45deg) translate(5px,5px); }
@@ -849,7 +849,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   font-size: 0.95rem;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.4s ease;
+  transition: background 0.4s ease, border-color 0.4s ease, transform 0.4s ease, box-shadow 0.4s ease;
   box-shadow: 0 2px 8px rgba(0,0,0,0.25);
   overflow: hidden;
 }
@@ -918,6 +918,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   inset: 0;
   z-index: 10000;
   background: #0A0604;
+  contain: layout style paint;
 }
 .room-overlay.hidden { display: none; }
 #room-canvas {
@@ -935,7 +936,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   font-size: 0.82rem;
   cursor: pointer;
   backdrop-filter: blur(8px);
-  transition: all 0.3s ease;
+  transition: background 0.3s ease, color 0.3s ease;
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -991,7 +992,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   font-size: 0.72rem;
   cursor: pointer;
   backdrop-filter: blur(6px);
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease;
   white-space: nowrap;
 }
 .room-switch-btn:hover {
@@ -1018,7 +1019,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s ease;
+  transition: background 0.25s ease, border-color 0.25s ease;
   backdrop-filter: blur(6px);
 }
 .room-icon-btn:hover {
@@ -1051,7 +1052,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   font-size: 0.65rem;
   letter-spacing: 0.05em;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
   backdrop-filter: blur(6px);
   text-align: center;
   min-width: 46px;
@@ -1122,7 +1123,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.25s ease;
+  transition: opacity 0.25s ease, background 0.25s ease;
   backdrop-filter: blur(8px);
   opacity: 0.7;
 }
@@ -1159,7 +1160,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   border: 2px solid rgba(212,175,55,0.25);
   border-radius: 3px;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: opacity 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
   opacity: 0.6;
 }
 .room-thumb:hover { opacity: 0.9; border-color: rgba(212,175,55,0.7); }
@@ -1197,6 +1198,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   transition: border-color 0.25s, transform 0.25s;
   cursor: pointer;
   aspect-ratio: 1 / 1;
+  will-change: transform;
 }
 .gallery-grid-item:hover {
   border-color: rgba(255, 215, 0, 0.45);
@@ -1209,6 +1211,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   display: block;
   filter: contrast(1.1) brightness(0.92) saturate(1.15);
   transition: filter 0.35s;
+  will-change: filter;
 }
 .gallery-grid-item:hover img {
   filter: contrast(1.05) brightness(1.05) saturate(1.25);
@@ -1507,6 +1510,8 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   background: var(--bg);
   border-top: 1px solid var(--border);
   contain: layout style paint;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100vh;
 }
 .section-inner {
   max-width: 1100px;
@@ -1717,7 +1722,7 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   border-radius: var(--radius);
   text-align: center;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s;
 }
 .tier-card:hover {
   border-color: var(--primary);
@@ -2006,13 +2011,27 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
 /* Speed & intensity controlled by --glow-speed and --glow-intensity (set by magical-overlays.js) */
 h2 {
   animation: goldGlow var(--glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
+}
+.content-panel.visible h2,
+.revealed h2,
+.normal-section h2 {
+  animation-play-state: running;
 }
 .hero-card h1 {
   animation: goldGlow var(--glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
+}
+.content-panel.visible .hero-card h1 {
+  animation-play-state: running;
 }
 .impact-heading {
   filter: drop-shadow(0 0 12px rgba(212,175,55,0.4));
   animation: goldGlow var(--glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
+}
+.content-panel.visible .impact-heading {
+  animation-play-state: running;
 }
 .loading-text {
   animation: fadeIn 1s 2s ease forwards, goldGlow var(--glow-speed, 4s) 3s ease-in-out infinite;
@@ -2061,9 +2080,11 @@ h2 {
 /* Speed controlled by --card-glow-speed (set by magical-overlays.js) */
 .flip-card {
   animation: cardGlowPulse var(--card-glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
 }
 .story-card {
   animation: cardGlowPulse var(--card-glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
 }
 .story-card:nth-child(2) { animation-delay: 1.3s; }
 .story-card:nth-child(3) { animation-delay: 2.6s; }
@@ -2072,6 +2093,12 @@ h2 {
 .flip-card:nth-child(4) { animation-delay: 3s; }
 .counter-card {
   animation: cardGlowPulse var(--card-glow-speed, 4s) ease-in-out infinite;
+  animation-play-state: paused;
+}
+.content-panel.visible .flip-card,
+.content-panel.visible .story-card,
+.content-panel.visible .counter-card {
+  animation-play-state: running;
 }
 
 /* === 5. AMBIENT FIREFLY PARTICLES === */
@@ -2091,8 +2118,7 @@ h2 {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(255,215,0,0.95) 0%, rgba(212,175,55,0.4) 40%, transparent 70%);
-  box-shadow: 0 0 8px 2px rgba(255,215,0,0.5), 0 0 20px 4px rgba(212,175,55,0.2);
+  background: radial-gradient(circle, rgba(255,215,0,0.95) 0%, rgba(212,175,55,0.4) 30%, rgba(255,215,0,0.15) 55%, transparent 75%);
   animation: fireflyFloat var(--dur) ease-in-out infinite;
   animation-delay: var(--del);
   will-change: transform;

@@ -8,6 +8,7 @@ var KRKAI_INIIBO = (function() {
   var speechEl, faqEl;
   var htmlIniiboEl;
   var progress = 0;
+  var _lastSection = null;  // cache to avoid FAQ DOM rebuild every scroll frame
 
   // === SPEECH BUBBLE DATA (per section) ===
   var SPEECH_DATA = {
@@ -147,8 +148,11 @@ var KRKAI_INIIBO = (function() {
     else if (p >= 0.95) section = 'closing';
 
     if (!section) {
-      speechEl.style.display = 'none';
-      faqEl.style.display = 'none';
+      if (_lastSection !== null) {
+        speechEl.style.display = 'none';
+        faqEl.style.display = 'none';
+        _lastSection = null;
+      }
       return;
     }
 
@@ -162,26 +166,32 @@ var KRKAI_INIIBO = (function() {
       return;
     }
 
-    // Fixed position near bottom-right INIIBO icon
-    speechEl.style.left = '';
-    speechEl.style.right = '90px';
-    speechEl.style.top = '';
-    speechEl.style.bottom = '100px';
+    // Only update DOM when section or language changes (avoids rebuild every scroll frame)
+    var sectionKey = lang + ':' + section;
+    if (sectionKey !== _lastSection) {
+      _lastSection = sectionKey;
 
-    speechEl.style.display = '';
-    speechEl.querySelector('.iniibo-speech-text').textContent = data.text;
+      // Fixed position near bottom-right INIIBO icon
+      speechEl.style.left = '';
+      speechEl.style.right = '90px';
+      speechEl.style.top = '';
+      speechEl.style.bottom = '100px';
 
-    // FAQ panel
-    var faqData = FAQ_DATA[lang] && FAQ_DATA[lang][section];
-    if (faqData && faqData.length > 0) {
-      buildFaqDOM(faqData);
-      faqEl.style.left = '';
-      faqEl.style.right = '90px';
-      faqEl.style.top = '';
-      faqEl.style.bottom = '160px';
-      faqEl.style.display = '';
-    } else {
-      faqEl.style.display = 'none';
+      speechEl.style.display = '';
+      speechEl.querySelector('.iniibo-speech-text').textContent = data.text;
+
+      // FAQ panel
+      var faqData = FAQ_DATA[lang] && FAQ_DATA[lang][section];
+      if (faqData && faqData.length > 0) {
+        buildFaqDOM(faqData);
+        faqEl.style.left = '';
+        faqEl.style.right = '90px';
+        faqEl.style.top = '';
+        faqEl.style.bottom = '160px';
+        faqEl.style.display = '';
+      } else {
+        faqEl.style.display = 'none';
+      }
     }
   }
 

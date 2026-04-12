@@ -56,8 +56,7 @@ var KRKAI_MagicalOverlays = (function() {
         '--fy2:' + (randSign() * rand(20, drift)) + 'px;' +
         '--dur:' + dur.toFixed(1) + 's;' +
         '--del:' + del.toFixed(1) + 's;' +
-        'background:radial-gradient(circle,rgba(255,215,0,' + coreOp + ') 0%,rgba(212,175,55,0.4) 40%,transparent 70%);' +
-        'box-shadow:0 0 ' + glowR + 'px 2px rgba(255,215,0,' + glowOp + '),0 0 ' + (glowR * 2.5) + 'px 4px rgba(212,175,55,' + (glowOp * 0.4) + ');';
+        'background:radial-gradient(circle,rgba(255,215,0,' + coreOp + ') 0%,rgba(212,175,55,0.4) 30%,rgba(255,215,0,0.15) 55%,transparent 75%);';
 
       container.appendChild(el);
     }
@@ -206,9 +205,14 @@ var KRKAI_MagicalOverlays = (function() {
     if (window.innerWidth < 768) return;
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
+    var tier = window.KRKAI_PerfTier || 'high';
+    if (tier === 'ultra-low') { applyConfigStyles(); return; }
+
     initFireflies();
-    initFog();
-    initPetals();
+    if (tier !== 'low') {
+      initFog();
+      initPetals();
+    }
     applyConfigStyles();
   }
 

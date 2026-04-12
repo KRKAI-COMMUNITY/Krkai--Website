@@ -43,6 +43,7 @@ var KRKAI_Scene = (function() {
   var targetFPS = _tierSettings.fpsTarget;
   var frameDuration = 1000 / targetFPS;
   var deltaTime = 0.016; // default 60fps frame time in seconds
+  var _animTime = 0;     // cached time from animate loop (performance.now * 0.001)
 
   // === AUTO-PERFORMANCE DETECTION ===
   var fpsFrameCount = 0;
@@ -424,8 +425,9 @@ var KRKAI_Scene = (function() {
       composer = new THREE.EffectComposer(renderer);
       composer.addPass(new THREE.RenderPass(scene, camera));
 
-      // Unreal Bloom — selective glow on bright emissive surfaces (use physical pixel resolution)
-      var resolution = new THREE.Vector2(window.innerWidth * pixelRatio, window.innerHeight * pixelRatio);
+      // Unreal Bloom — half-resolution bloom (blur hides lower resolution, saves 75% GPU on 2x DPR)
+      var bloomScale = pixelRatio >= 1.5 ? 0.5 : 0.75;
+      var resolution = new THREE.Vector2(window.innerWidth * pixelRatio * bloomScale, window.innerHeight * pixelRatio * bloomScale);
       bloomPass = new THREE.UnrealBloomPass(resolution, 0.0, 0.40, 0.90);
       // strength: starts at 0 (no bloom at intro overhead view), radius: 0.40 (tight), threshold: 0.90 (only true emissives bloom — prevents parchment washout)
       bloomPass.enabled = false;  // disabled until strength > 0 (saves a full render pass)
@@ -2501,7 +2503,7 @@ var KRKAI_Scene = (function() {
     // Multi-frequency Lissajous sum creates organic, non-mechanical camera tremor.
     // Amplitude scales with shot type: imperceptible during intimate/macro shots,
     // subtly present during flight, slightly stronger during dramatic orbit.
-    var breatheTime = Date.now() * 0.001;
+    var breatheTime = _animTime;
     var t = breatheTime;
     var shakeAmp = 0.0040;
     if (progress < 0.05 || (progress > 0.78 && progress < 0.88)) {
@@ -2543,6 +2545,7 @@ var KRKAI_Scene = (function() {
     // Use performance.now() (seconds since page load, starts near 0) NOT Date.now()
     // — GLSL 32-bit float loses precision at epoch time (~1.7e9), freezing GPU animations
     var time = now * 0.001;
+    _animTime = time;
     particleThrottleFrame++;
 
     updateAmbientParticles(time);

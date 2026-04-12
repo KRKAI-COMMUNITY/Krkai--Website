@@ -38,6 +38,11 @@ var KRKAI_Pen = (function() {
   var _tmpEuler2 = new THREE.Euler();
   var _tmpQuat1 = new THREE.Quaternion();
   var _tmpQuat2 = new THREE.Quaternion();
+  // Reusable nib/trail temps (avoid per-frame allocations in update loop)
+  var _nibOffset = new THREE.Vector3();
+  var _nibTipPos = new THREE.Vector3();
+  var _trailColor = new THREE.Color(0xD4AF37);
+  var _trailColorTarget = new THREE.Color(0xFFE855);
   // (targetRotationX removed — orientation now handled via quaternion flight system)
 
   // Create a circular canvas texture so trail particles appear as circles (not squares)
@@ -786,13 +791,13 @@ var KRKAI_Pen = (function() {
     // Use penGroup.position (includes penFlyY hover offset) so nibTipPos always
     // matches the VISUAL tip of the pen, not the raw path point.
     var nibScale = penGroup.scale.y;  // already set above
-    var nibOffset = new THREE.Vector3(0, -0.24 * nibScale, 0);
-    nibOffset.applyQuaternion(currentQuaternion);
-    var nibTipPos = new THREE.Vector3().copy(penGroup.position).add(nibOffset);
+    _nibOffset.set(0, -0.24 * nibScale, 0);
+    _nibOffset.applyQuaternion(currentQuaternion);
+    _nibTipPos.copy(penGroup.position).add(_nibOffset);
 
     // Update nib light position — place AT the nib tip (quaternion-correct)
     if (nibLight) {
-      nibLight.position.copy(nibTipPos);
+      nibLight.position.copy(_nibTipPos);
     }
 
     // Calculate pen speed for trail emission
@@ -805,13 +810,13 @@ var KRKAI_Pen = (function() {
       var _maxE = _tpc ? _tpc.maxEmit : 12;
       var emitCount = Math.max(_minE, Math.min(Math.ceil(penSpeed * 600), _maxE));
 
-      // Gold trail brightens slightly at high speed
-      var trailColor = new THREE.Color(0xD4AF37);
-      if (penSpeed > 0.04) trailColor.lerp(new THREE.Color(0xFFE855), Math.min((penSpeed - 0.04) * 15, 1));
-      trailParticles.material.color.lerp(trailColor, 0.1);
+      // Gold trail brightens slightly at high speed (reuse pooled Color objects)
+      _trailColor.set(0xD4AF37);
+      if (penSpeed > 0.04) _trailColor.lerp(_trailColorTarget, Math.min((penSpeed - 0.04) * 15, 1));
+      trailParticles.material.color.lerp(_trailColor, 0.1);
 
       for (var e = 0; e < emitCount; e++) {
-        emitTrailParticle(nibTipPos);
+        emitTrailParticle(_nibTipPos);
       }
     }
 

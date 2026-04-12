@@ -12,6 +12,7 @@ var KRKAI_Cursor = (function() {
   var mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   var lastMouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
   var idleFrames = 0;
+  var isIdle = false;
   // Halo position tracked in JS — avoids getBoundingClientRect() layout reflow every frame
   var haloX = window.innerWidth / 2;
   var haloY = window.innerHeight / 2;
@@ -43,6 +44,7 @@ var KRKAI_Cursor = (function() {
       mouse.y = e.clientY;
       idleFrames = 0; // reset idle
       updateCursorDOM(e.clientX, e.clientY);
+      if (isIdle) { isIdle = false; requestAnimationFrame(render); }
     });
 
     // Hide cursor when leaving window
@@ -77,9 +79,7 @@ var KRKAI_Cursor = (function() {
   }
 
   function render() {
-    if (!isMobile) {
-      requestAnimationFrame(render);
-    }
+    if (isMobile) return;
 
     // Performance optimization: skip rendering if mouse hasn't moved for 60 frames (~1 sec)
     if (Math.abs(mouse.x - lastMouse.x) < 0.1 && Math.abs(mouse.y - lastMouse.y) < 0.1) {
@@ -87,13 +87,16 @@ var KRKAI_Cursor = (function() {
     } else {
       idleFrames = 0;
     }
-    
+
     lastMouse.x = mouse.x;
     lastMouse.y = mouse.y;
 
     if (idleFrames > 60) {
-      return; // Skip drawing when idle
+      isIdle = true;
+      return; // Stop rAF loop — mousemove handler restarts it
     }
+
+    requestAnimationFrame(render);
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
