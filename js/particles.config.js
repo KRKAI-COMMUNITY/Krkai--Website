@@ -9,9 +9,9 @@ var KRKAI_ParticleConfig = {
 
   // ── GOLDEN BOKEH / MAGICAL DUST ─────────────────────────
   magical: {
-    countDesktop: 200,   // particles on desktop
+    countDesktop: 50,   // particles on desktop
     countTablet: 400,   // particles on tablet
-    countMobile: 50,   // particles on mobile
+    countMobile: 5,   // particles on mobile
     size: 0.058,  // base size in world units
     sizeBreath: 0.30,   // breathing amplitude (0=static, 0.5=big pulse)
     opacity: 0.55,   // transparency (0=invisible, 1=solid)
@@ -20,9 +20,9 @@ var KRKAI_ParticleConfig = {
 
   // ── MAGICAL BUTTERFLIES ──────────────────────────────────
   butterflies: {
-    countDesktop: 100,    // total butterflies on desktop
+    countDesktop: 80,    // total butterflies on desktop
     countTablet: 150,    // total butterflies on tablet
-    countMobile: 45,    // butterflies on mobile (0 = disabled)
+    countMobile: 25,    // butterflies on mobile (0 = disabled)
     sizeSmall: 0.14,     // small variant base size
     sizeMed: 0.24,     // medium variant base size
     sizeLarge: 0.36,     // large variant base size
@@ -31,9 +31,9 @@ var KRKAI_ParticleConfig = {
 
   // ── MAGICAL FLOWERS ─────────────────────────────────────
   flowers: {
-    countDesktop: 800,    // total flowers on desktop
+    countDesktop: 500,    // total flowers on desktop
     countTablet: 500,    // total flowers on tablet
-    countMobile: 100,    // flowers on mobile (0 = disabled)
+    countMobile: 40,    // flowers on mobile (0 = disabled)
     sizeSmall: 0.12,     // small variant base size
     sizeMed: 0.22,     // medium variant base size
     sizeLarge: 0.34,     // large variant base size
@@ -42,9 +42,9 @@ var KRKAI_ParticleConfig = {
 
   // ── AMBIENT DUST MOTES ───────────────────────────────────
   ambient: {
-    countDesktop: 300,    // dust motes on desktop
+    countDesktop: 100,    // dust motes on desktop
     countTablet: 1000,    // dust motes on tablet
-    countMobile: 60,    // dust motes on mobile
+    countMobile: 20,    // dust motes on mobile
     opacity: 0.22     // dust mote transparency
   },
 
@@ -55,8 +55,8 @@ var KRKAI_ParticleConfig = {
 
   // ── PEN TRAIL ────────────────────────────────────────────
   trail: {
-    countDesktop: 150,    // trail particle pool size on desktop
-    countMobile: 50,    // trail particle pool size on mobile
+    countDesktop: 70,    // trail particle pool size on desktop
+    countMobile: 15,    // trail particle pool size on mobile
     sizeDesktop: 0.01,    // particle size on desktop — large enough to be clearly visible
     sizeMobile: 0.01,    // particle size on mobile
     opacity: 1.0,     // trail transparency — fully opaque for max visibility
@@ -68,7 +68,7 @@ var KRKAI_ParticleConfig = {
 
   // ── CSS FIREFLIES (golden floating light orbs) ─────────
   fireflies: {
-    count: 10,         // number of fireflies (0 = disabled)
+    count: 6,         // number of fireflies (0 = disabled)
     size: 25,           // diameter in px (3-10 recommended)
     glowRadius: 100,     // box-shadow glow spread in px
     glowOpacity: 0.6,  // glow intensity (0=none, 1=full)
@@ -85,7 +85,7 @@ var KRKAI_ParticleConfig = {
   // entire room — like a dreamy enchanted atmosphere.
   fog: {
     enabled: true,      // set false to disable mist entirely
-    cloudCount: 5,     // number of mist clouds (5=light, 15=heavy)
+    cloudCount: 3,     // number of mist clouds (5=light, 15=heavy)
     cloudOpacity: 0.05, // base opacity of each cloud (0.05=faint, 0.50=thick)
     blurMin: 15,        // minimum blur radius in px (higher = softer)
     blurMax: 35,        // maximum blur radius in px
@@ -100,7 +100,7 @@ var KRKAI_ParticleConfig = {
 
   // ── CSS FALLING PETALS (purple & gold) ─────────────────
   petals: {
-    count: 30,          // total petals (0 = disabled)
+    count: 15,          // total petals (0 = disabled)
     purpleRatio: 5.0,  // fraction that are purple (rest are gold)
     sizeMin: 10,        // smallest petal size in px
     sizeMax: 15,       // largest petal size in px
