@@ -1510,8 +1510,6 @@ h3 { font-size: clamp(1rem, 2vw, 1.3rem); margin-bottom: 0.5rem; }
   background: var(--bg);
   border-top: 1px solid var(--border);
   contain: layout style paint;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 100vh;
 }
 .section-inner {
   max-width: 1100px;
